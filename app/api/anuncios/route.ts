@@ -74,7 +74,7 @@ export async function GET(request: Request) {
       ORDER BY a.id DESC
     `;
 
-    // 3. APLICAR FILTROS (COMBINABLES O INDIVIDUALES)
+    // 3. APLICAR FILTROS
     let filtrados = todosAnuncios;
 
     if (q.trim()) {
@@ -132,11 +132,18 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { vendedor_id, titulo, precio, condicion, categoria, ciudad, descripcion, foto1, foto2, foto3, foto4, metodos_pago, metodos_envio } = body;
+    const { vendedor_id, vendedor_email, titulo, precio, condicion, categoria, ciudad, descripcion, foto1, foto2, foto3, foto4, metodos_pago, metodos_envio } = body;
 
-    const vId = parseInt(String(vendedor_id));
+    let vId = parseInt(String(vendedor_id));
+
+    // Auto-recuperación por correo electrónico si el id en localStorage era undefined
+    if ((isNaN(vId) || vId <= 0) && vendedor_email) {
+      const uEmail = await sql`SELECT id FROM perfiles WHERE LOWER(email) = ${vendedor_email.trim().toLowerCase()}`;
+      if (uEmail.length > 0) vId = uEmail[0].id;
+    }
+
     if (isNaN(vId) || vId <= 0) {
-      return NextResponse.json({ error: 'Tu sesión ha expirado. Por favor cierra sesión y vuelve a ingresar para publicar.' }, { status: 400 });
+      return NextResponse.json({ error: 'Tu sesión no contiene un ID de vendedor válido. Por favor cierra sesión y vuelve a ingresar para publicar.' }, { status: 400 });
     }
 
     if (!titulo || !precio) {

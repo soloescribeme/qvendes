@@ -214,8 +214,8 @@ export default function QvendesHome() {
   // ACTUALIZAR PERFIL DE USUARIO LOGEADO
   const handleUpdateProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !user.id) {
-      alert('Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
+    if (!user) {
+      alert('Debes iniciar sesión para actualizar tu perfil.');
       setMostrarModalPerfil(false);
       setModoAuth('login');
       setMostrarModalAuth(true);
@@ -230,6 +230,7 @@ export default function QvendesHome() {
         body: JSON.stringify({
           action: 'update_profile',
           usuario_id: user.id,
+          email: user.email,
           nombre: editNombre,
           celular: editCelular,
           ciudad: editCiudad,
@@ -264,7 +265,7 @@ export default function QvendesHome() {
   // PUBLICAR ANUNCIO CON MENSAJE DE ÉXITO Y REINICIO DE FORMULARIO
   const handlePublicarSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !user.id) {
+    if (!user) {
       alert('Debes iniciar sesión primero para publicar un anuncio.');
       setMostrarModalPublicar(false);
       setModoAuth('login');
@@ -286,6 +287,7 @@ export default function QvendesHome() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           vendedor_id: user.id,
+          vendedor_email: user.email,
           titulo: pubTitulo,
           precio: pubPrecio,
           condicion: pubCondicion,

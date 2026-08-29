@@ -143,10 +143,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, user: usuarioLimpio });
     }
 
-    // 4. ACTUALIZAR PERFIL DE USUARIO
+    // 4. ACTUALIZAR PERFIL DE USUARIO (CON RECUPERACIÓN POR EMAIL SI FALTARA EL ID)
     if (action === 'update_profile') {
-      if (!usuario_id || !nombre) {
-        return NextResponse.json({ error: 'Nombres y usuario son obligatorios.' }, { status: 400 });
+      let targetId = parseInt(String(usuario_id));
+
+      if (isNaN(targetId) && email) {
+        const uEmail = await sql`SELECT id FROM perfiles WHERE LOWER(email) = ${email.trim().toLowerCase()}`;
+        if (uEmail.length > 0) targetId = uEmail[0].id;
+      }
+
+      if (isNaN(targetId)) {
+        return NextResponse.json({ error: 'No se pudo identificar la cuenta. Por favor cierra sesión y vuelve a ingresar.' }, { status: 400 });
       }
 
       if (password && password.trim().length > 0) {
@@ -157,7 +164,7 @@ export async function POST(request: Request) {
             celular = ${celular || ''},
             ciudad = ${ciudad || 'Loja'},
             password_hash = ${newHash}
-          WHERE id = ${parseInt(usuario_id)}
+          WHERE id = ${targetId}
         `;
       } else {
         await sql`
@@ -165,11 +172,15 @@ export async function POST(request: Request) {
             nombre = ${nombre},
             celular = ${celular || ''},
             ciudad = ${ciudad || 'Loja'}
-          WHERE id = ${parseInt(usuario_id)}
+          WHERE id = ${targetId}
         `;
       }
 
-      const actualizados = await sql`SELECT * FROM perfiles WHERE id = ${parseInt(usuario_id)}`;
+      const actualizados = await sql`SELECT * FROM perfiles WHERE id = ${targetId}`;
+      if (actualizados.length === 0) {
+        return NextResponse.json({ error: 'No se encontró el perfil de usuario en la base de datos.' }, { status: 404 });
+      }
+
       const u = actualizados[0];
 
       return NextResponse.json({
