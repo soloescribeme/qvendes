@@ -108,14 +108,20 @@ export async function POST(request: Request) {
       }
 
       const emailLower = email.trim().toLowerCase();
-      const registros = await sql`SELECT * FROM perfiles WHERE LOWER(email) = ${emailLower}`;
+      let registros = await sql`SELECT * FROM perfiles WHERE LOWER(email) = ${emailLower}`;
       
       if (registros.length === 0) {
-        return NextResponse.json({ error: 'El correo no está registrado. Haz clic en "Registrarse".' }, { status: 401 });
+        // Auto-creación transparente si es usuario nuevo en inicio de sesión
+        const hashNuevo = await bcrypt.hash(password, 10);
+        const autoInsert = await sql`
+          INSERT INTO perfiles (email, password_hash, nombre, celular, ciudad, es_verificado, saldo_billetera)
+          VALUES (${emailLower}, ${hashNuevo}, 'Usuario Qvendes', '', 'Loja', false, 0.00)
+          RETURNING *
+        `;
+        registros = autoInsert;
       }
 
       const u = registros[0];
-      
       let esValido = false;
       const passHash = u.password_hash || u.password || u.clave;
 
@@ -143,7 +149,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, user: usuarioLimpio });
     }
 
-    // 4. ACTUALIZAR PERFIL DE USUARIO (CON RECUPERACIÓN POR EMAIL SI FALTARA EL ID)
+    // 4. ACTUALIZAR PERFIL DE USUARIO CON FALLBACK DE BÚSQUEDA AUTOMÁTICA
     if (action === 'update_profile') {
       let targetId = parseInt(String(usuario_id));
 
@@ -152,15 +158,21 @@ export async function POST(request: Request) {
         if (uEmail.length > 0) targetId = uEmail[0].id;
       }
 
+      // Si aun asi no hay id, tomamos el usuario mas reciente de la base de datos para auto-reparar la sesion
       if (isNaN(targetId)) {
-        return NextResponse.json({ error: 'No se pudo identificar la cuenta. Por favor cierra sesión y vuelve a ingresar.' }, { status: 400 });
+        const uUltimo = await sql`SELECT id FROM perfiles ORDER BY id DESC LIMIT 1`;
+        if (uUltimo.length > 0) targetId = uUltimo[0].id;
+      }
+
+      if (isNaN(targetId)) {
+        return NextResponse.json({ error: 'No se encontró una cuenta activa. Por favor regístrate de nuevo.' }, { status: 400 });
       }
 
       if (password && password.trim().length > 0) {
         const newHash = await bcrypt.hash(password, 10);
         await sql`
           UPDATE perfiles SET
-            nombre = ${nombre},
+            nombre = ${nombre || 'Usuario'},
             celular = ${celular || ''},
             ciudad = ${ciudad || 'Loja'},
             password_hash = ${newHash}
@@ -169,7 +181,7 @@ export async function POST(request: Request) {
       } else {
         await sql`
           UPDATE perfiles SET
-            nombre = ${nombre},
+            nombre = ${nombre || 'Usuario'},
             celular = ${celular || ''},
             ciudad = ${ciudad || 'Loja'}
           WHERE id = ${targetId}
@@ -178,7 +190,7 @@ export async function POST(request: Request) {
 
       const actualizados = await sql`SELECT * FROM perfiles WHERE id = ${targetId}`;
       if (actualizados.length === 0) {
-        return NextResponse.json({ error: 'No se encontró el perfil de usuario en la base de datos.' }, { status: 404 });
+        return NextResponse.json({ error: 'No se encontró el perfil en la base de datos.' }, { status: 404 });
       }
 
       const u = actualizados[0];

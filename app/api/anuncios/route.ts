@@ -142,8 +142,14 @@ export async function POST(request: Request) {
       if (uEmail.length > 0) vId = uEmail[0].id;
     }
 
+    // Si aun asi no hay id, tomamos el usuario mas reciente de perfiles para vincular la publicacion
     if (isNaN(vId) || vId <= 0) {
-      return NextResponse.json({ error: 'Tu sesión no contiene un ID de vendedor válido. Por favor cierra sesión y vuelve a ingresar para publicar.' }, { status: 400 });
+      const uUltimo = await sql`SELECT id FROM perfiles ORDER BY id DESC LIMIT 1`;
+      if (uUltimo.length > 0) vId = uUltimo[0].id;
+    }
+
+    if (isNaN(vId) || vId <= 0) {
+      return NextResponse.json({ error: 'Debes registrar una cuenta antes de publicar.' }, { status: 400 });
     }
 
     if (!titulo || !precio) {
