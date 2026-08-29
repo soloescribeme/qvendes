@@ -29,7 +29,6 @@ export async function POST(request: Request) {
         )
       `;
       
-      // Auto-migraciones por si la tabla existía previamente con menos columnas
       await sql`ALTER TABLE perfiles ADD COLUMN IF NOT EXISTS celular VARCHAR(50)`;
       await sql`ALTER TABLE perfiles ADD COLUMN IF NOT EXISTS ciudad VARCHAR(100)`;
       await sql`ALTER TABLE perfiles ADD COLUMN IF NOT EXISTS es_verificado BOOLEAN DEFAULT false`;
@@ -43,16 +42,38 @@ export async function POST(request: Request) {
       console.warn('Verificacion de columnas de perfiles:', e);
     }
 
-    // 2. REGISTRO DE USUARIO COMÚN (Nombres, Ciudad, Teléfono, Correo, Password)
+    // 2. REGISTRO DE USUARIO COMÚN
     if (action === 'register') {
       if (!email || !password || !nombre) {
         return NextResponse.json({ error: 'Por favor completa Nombres, Correo y Contraseña.' }, { status: 400 });
       }
 
       const emailLower = email.trim().toLowerCase();
-      const existentes = await sql`SELECT id FROM perfiles WHERE LOWER(email) = ${emailLower}`;
+      const existentes = await sql`SELECT id, password_hash FROM perfiles WHERE LOWER(email) = ${emailLower}`;
+      
       if (existentes.length > 0) {
-        return NextResponse.json({ error: 'El correo electrónico ya está registrado. Por favor inicia sesión.' }, { status: 400 });
+        // Si ya existe pero el registro previo no tuvo contraseña válida, actualizamos la contraseña para auto-sanar la cuenta
+        const uExistente = existentes[0];
+        if (!uExistente.password_hash || uExistente.password_hash.length < 10) {
+          const newHash = await bcrypt.hash(password, 10);
+          await sql`UPDATE perfiles SET password_hash = ${newHash}, nombre = ${nombre} WHERE id = ${uExistente.id}`;
+          const recuperado = await sql`SELECT id, email, nombre, celular, ciudad, es_verificado, saldo_billetera FROM perfiles WHERE id = ${uExistente.id}`;
+          const u = recuperado[0];
+          return NextResponse.json({
+            success: true,
+            user: {
+              id: u.id,
+              email: u.email,
+              nombre: u.nombre,
+              celular: u.celular || '',
+              ciudad: u.ciudad || 'Loja',
+              es_verificado: Boolean(u.es_verificado),
+              saldo_billetera: u.saldo_billetera ? parseFloat(u.saldo_billetera) : 0
+            }
+          });
+        }
+
+        return NextResponse.json({ error: 'El correo electrónico ya está registrado. Por favor selecciona "Iniciar Sesión".' }, { status: 400 });
       }
 
       const hash = await bcrypt.hash(password, 10);
@@ -76,7 +97,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, user: usuarioCreado });
     }
 
-    // 3. INICIO DE SESIÓN
+    // 3. INICIO DE SESIÓN CON AUTO-RECUPERACIÓN
     if (action === 'login') {
       if (!email || !password) {
         return NextResponse.json({ error: 'Ingresa tu correo y contraseña.' }, { status: 400 });
@@ -85,11 +106,25 @@ export async function POST(request: Request) {
       const emailLower = email.trim().toLowerCase();
       const registros = await sql`SELECT id, email, password_hash, nombre, celular, ciudad, es_verificado, saldo_billetera FROM perfiles WHERE LOWER(email) = ${emailLower}`;
       if (registros.length === 0) {
-        return NextResponse.json({ error: 'Credenciales incorrectas o usuario no registrado.' }, { status: 401 });
+        return NextResponse.json({ error: 'El correo no está registrado. Haz clic en "Registrarse".' }, { status: 401 });
       }
 
       const u = registros[0];
-      const esValido = await bcrypt.compare(password, u.password_hash);
+      
+      let esValido = false;
+      if (u.password_hash && u.password_hash.length >= 10) {
+        try {
+          esValido = await bcrypt.compare(password, u.password_hash);
+        } catch {}
+      }
+
+      // Si la contraseña no era válida debido a un registro previo incompleto, la actualizamos automáticamente con la nueva clave ingresada
+      if (!esValido && (!u.password_hash || u.password_hash.length < 10)) {
+        const hashNuevo = await bcrypt.hash(password, 10);
+        await sql`UPDATE perfiles SET password_hash = ${hashNuevo} WHERE id = ${u.id}`;
+        esValido = true;
+      }
+
       if (!esValido) {
         return NextResponse.json({ error: 'Contraseña incorrecta. Por favor verifica tus datos.' }, { status: 401 });
       }
@@ -107,7 +142,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, user: usuarioLimpio });
     }
 
-    // 4. FORMULARIO DE VERIFICACIÓN DE IDENTIDAD (100% PRIVADO RESERVADO DE LA PLATAFORMA)
+    // 4. FORMULARIO DE VERIFICACIÓN DE IDENTIDAD PRIVADA
     if (action === 'verificar_identidad') {
       if (!usuario_id || !documento_cedula || !direccion_fisica) {
         return NextResponse.json({ error: 'Faltan datos obligatorios de verificación.' }, { status: 400 });
@@ -129,7 +164,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ error: 'Acción no válida.' }, { status: 400 });
   } catch (error) {
-    console.error('Error detallado en API Auth de Qvendes:', error);
-    return NextResponse.json({ error: 'Error al procesar la solicitud en el servidor. Intenta de nuevo.' }, { status: 500 });
+    console.error('Error en API Auth de Qvendes:', error);
+    return NextResponse.json({ error: 'Error al procesar la solicitud. Por favor intenta de nuevo.' }, { status: 500 });
   }
 }
