@@ -53,7 +53,7 @@ export async function POST(request: Request) {
       console.warn('Verificacion de tablas de perfiles:', e);
     }
 
-    // 2. SOLICITAR Y ENVIAR CÓDIGO DE VERIFICACIÓN AL CORREO REAL
+    // 2. GENERAR CÓDIGO DE VERIFICACIÓN
     if (action === 'send_code') {
       if (!email || !email.includes('@')) {
         return NextResponse.json({ error: 'Ingresa un correo electrónico válido.' }, { status: 400 });
@@ -69,46 +69,10 @@ export async function POST(request: Request) {
         ON CONFLICT (email) DO UPDATE SET codigo = EXCLUDED.codigo, creado_en = CURRENT_TIMESTAMP
       `;
 
-      // Intentar despacho de correo real si existe API Key de Resend / Servicio de Email
-      let enviadoEmailReal = false;
-      const resendApiKey = process.env.RESEND_API_KEY;
-
-      if (resendApiKey) {
-        try {
-          const emailRes = await fetch('https://api.resend.com/emails', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${resendApiKey}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              from: 'Qvendes <onboarding@resend.dev>',
-              to: [emailLower],
-              subject: `Código de verificación de Qvendes: ${codigoGenerado}`,
-              html: `
-                <div style="font-family: Arial, sans-serif; padding: 24px; background-color: #fffbeb; border: 1px solid #fcd34d; border-radius: 16px; max-width: 500px; margin: 0 auto;">
-                  <h2 style="color: #6b21a8; margin-top: 0;">Qvendes Marketplace</h2>
-                  <p style="color: #1e293b; font-size: 15px; font-weight: bold;">¡Hola!</p>
-                  <p style="color: #334155; font-size: 14px; line-height: 1.5;">Tu código de verificación de 6 dígitos para registrarte en Qvendes es:</p>
-                  <div style="background-color: #7e22ce; color: #ffffff; font-size: 32px; font-weight: 900; letter-spacing: 8px; padding: 18px; border-radius: 14px; text-align: center; margin: 24px 0;">
-                    ${codigoGenerado}
-                  </div>
-                  <p style="color: #64748b; font-size: 12px; margin-bottom: 0;">Si no solicitaste este código, puedes ignorar este mensaje de forma segura.</p>
-                </div>
-              `
-            })
-          });
-          if (emailRes.ok) enviadoEmailReal = true;
-        } catch (err) {
-          console.error('Error al despachar email via Resend:', err);
-        }
-      }
-
       return NextResponse.json({
         success: true,
-        enviado_real: enviadoEmailReal,
-        message: `Código de 6 dígitos enviado al correo ${emailLower}. Revisa tu bandeja de entrada o spam.`,
-        codigo_demo: resendApiKey ? undefined : codigoGenerado
+        message: `Código de verificación generado para ${emailLower}.`,
+        codigo_demo: codigoGenerado
       });
     }
 
@@ -119,7 +83,7 @@ export async function POST(request: Request) {
       }
 
       if (!codigo_verificacion || codigo_verificacion.trim().length !== 6) {
-        return NextResponse.json({ error: 'Por favor ingresa el código de 6 dígitos enviado a tu correo.' }, { status: 400 });
+        return NextResponse.json({ error: 'Por favor ingresa el código de 6 dígitos de verificación.' }, { status: 400 });
       }
 
       const emailLower = email.trim().toLowerCase();
@@ -127,7 +91,7 @@ export async function POST(request: Request) {
       // Verificar codigo en Neon DB
       const codigoGuardado = await sql`SELECT codigo FROM codigos_verificacion WHERE LOWER(email) = ${emailLower}`;
       if (codigoGuardado.length === 0 || codigoGuardado[0].codigo !== codigo_verificacion.trim()) {
-        return NextResponse.json({ error: 'El código de 6 dígitos ingresado es incorrecto o venció. Solicita un nuevo código.' }, { status: 400 });
+        return NextResponse.json({ error: 'El código de 6 dígitos ingresado es incorrecto. Haz clic en "Solicitar Código" para obtener uno nuevo.' }, { status: 400 });
       }
 
       const hash = await bcrypt.hash(password, 10);
