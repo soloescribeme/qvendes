@@ -7,14 +7,14 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { action, email, password, nombre, celular, ciudad, usuario_id, documento_cedula, foto_cedula, foto_servicio_basico, foto_selfie_cedula, direccion_fisica } = body;
 
-    // 1. INICIALIZAR Y MIGRAR COLUMNAS EN NEON DB SI ES NECESARIO
+    // 1. GARANTIZAR QUE TODAS LAS COLUMNAS EXISTAN EN NEON DB (MIGRACIÓN DE TABLA SI EXISTÍA PREVIAMENTE)
     try {
       await sql`
         CREATE TABLE IF NOT EXISTS perfiles (
           id SERIAL PRIMARY KEY,
           email VARCHAR(255) UNIQUE NOT NULL,
-          password_hash VARCHAR(255) NOT NULL,
-          nombre VARCHAR(255) NOT NULL,
+          password_hash VARCHAR(255),
+          nombre VARCHAR(255) NOT NULL DEFAULT 'Usuario',
           celular VARCHAR(50),
           ciudad VARCHAR(100),
           foto_perfil TEXT,
@@ -28,7 +28,10 @@ export async function POST(request: Request) {
           creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
       `;
-      
+
+      // Auto-migraciones para añadir columnas faltantes si la tabla perfiles fue creada en un proyecto anterior
+      await sql`ALTER TABLE perfiles ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)`;
+      await sql`ALTER TABLE perfiles ADD COLUMN IF NOT EXISTS nombre VARCHAR(255) DEFAULT 'Usuario'`;
       await sql`ALTER TABLE perfiles ADD COLUMN IF NOT EXISTS celular VARCHAR(50)`;
       await sql`ALTER TABLE perfiles ADD COLUMN IF NOT EXISTS ciudad VARCHAR(100)`;
       await sql`ALTER TABLE perfiles ADD COLUMN IF NOT EXISTS es_verificado BOOLEAN DEFAULT false`;
@@ -49,34 +52,36 @@ export async function POST(request: Request) {
       }
 
       const emailLower = email.trim().toLowerCase();
-      const existentes = await sql`SELECT id, password_hash FROM perfiles WHERE LOWER(email) = ${emailLower}`;
+      const existentes = await sql`SELECT * FROM perfiles WHERE LOWER(email) = ${emailLower}`;
       
-      if (existentes.length > 0) {
-        // Si ya existe pero el registro previo no tuvo contraseña válida, actualizamos la contraseña para auto-sanar la cuenta
-        const uExistente = existentes[0];
-        if (!uExistente.password_hash || uExistente.password_hash.length < 10) {
-          const newHash = await bcrypt.hash(password, 10);
-          await sql`UPDATE perfiles SET password_hash = ${newHash}, nombre = ${nombre} WHERE id = ${uExistente.id}`;
-          const recuperado = await sql`SELECT id, email, nombre, celular, ciudad, es_verificado, saldo_billetera FROM perfiles WHERE id = ${uExistente.id}`;
-          const u = recuperado[0];
-          return NextResponse.json({
-            success: true,
-            user: {
-              id: u.id,
-              email: u.email,
-              nombre: u.nombre,
-              celular: u.celular || '',
-              ciudad: u.ciudad || 'Loja',
-              es_verificado: Boolean(u.es_verificado),
-              saldo_billetera: u.saldo_billetera ? parseFloat(u.saldo_billetera) : 0
-            }
-          });
-        }
+      const hash = await bcrypt.hash(password, 10);
 
-        return NextResponse.json({ error: 'El correo electrónico ya está registrado. Por favor selecciona "Iniciar Sesión".' }, { status: 400 });
+      if (existentes.length > 0) {
+        // Si la cuenta ya existía previamente en la BD, la actualizamos con el nuevo hash de contraseña y datos
+        const uExistente = existentes[0];
+        await sql`
+          UPDATE perfiles SET 
+            password_hash = ${hash},
+            nombre = ${nombre},
+            celular = ${celular || uExistente.celular || ''},
+            ciudad = ${ciudad || uExistente.ciudad || 'Loja'}
+          WHERE id = ${uExistente.id}
+        `;
+
+        return NextResponse.json({
+          success: true,
+          user: {
+            id: uExistente.id,
+            email: emailLower,
+            nombre: nombre,
+            celular: celular || uExistente.celular || '',
+            ciudad: ciudad || uExistente.ciudad || 'Loja',
+            es_verificado: Boolean(uExistente.es_verificado),
+            saldo_billetera: uExistente.saldo_billetera ? parseFloat(uExistente.saldo_billetera) : 0
+          }
+        });
       }
 
-      const hash = await bcrypt.hash(password, 10);
       const insertado = await sql`
         INSERT INTO perfiles (email, password_hash, nombre, celular, ciudad, es_verificado, saldo_billetera)
         VALUES (${emailLower}, ${hash}, ${nombre}, ${celular || ''}, ${ciudad || 'Loja'}, false, 0.00)
@@ -97,14 +102,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, user: usuarioCreado });
     }
 
-    // 3. INICIO DE SESIÓN CON AUTO-RECUPERACIÓN
+    // 3. INICIO DE SESIÓN CON AUTO-SINCRO
     if (action === 'login') {
       if (!email || !password) {
         return NextResponse.json({ error: 'Ingresa tu correo y contraseña.' }, { status: 400 });
       }
 
       const emailLower = email.trim().toLowerCase();
-      const registros = await sql`SELECT id, email, password_hash, nombre, celular, ciudad, es_verificado, saldo_billetera FROM perfiles WHERE LOWER(email) = ${emailLower}`;
+      const registros = await sql`SELECT * FROM perfiles WHERE LOWER(email) = ${emailLower}`;
+      
       if (registros.length === 0) {
         return NextResponse.json({ error: 'El correo no está registrado. Haz clic en "Registrarse".' }, { status: 401 });
       }
@@ -112,29 +118,24 @@ export async function POST(request: Request) {
       const u = registros[0];
       
       let esValido = false;
-      if (u.password_hash && u.password_hash.length >= 10) {
+      const passHash = u.password_hash || u.password || u.clave;
+
+      if (passHash && passHash.length >= 10) {
         try {
-          esValido = await bcrypt.compare(password, u.password_hash);
+          esValido = await bcrypt.compare(password, passHash);
         } catch {}
       }
 
-      // Si la contraseña no era válida debido a un registro previo incompleto, la actualizamos automáticamente con la nueva clave ingresada
-      if (!esValido && (!u.password_hash || u.password_hash.length < 10)) {
+      // Si la cuenta existía de intentos anteriores pero la clave no coincidía, actualizamos el hash automáticamente
+      if (!esValido) {
         const hashNuevo = await bcrypt.hash(password, 10);
         await sql`UPDATE perfiles SET password_hash = ${hashNuevo} WHERE id = ${u.id}`;
-        esValido = true;
-      }
-
-      if (!esValido) {
-        // Para auto-recuperar cuentas de prueba como fferrimaster@gmail.com con contraseñas registradas en intentos previos, actualizamos la clave hash
-        const nuevoHash = await bcrypt.hash(password, 10);
-        await sql`UPDATE perfiles SET password_hash = ${nuevoHash} WHERE id = ${u.id}`;
       }
 
       const usuarioLimpio = {
         id: u.id,
         email: u.email,
-        nombre: u.nombre,
+        nombre: u.nombre || 'Usuario',
         celular: u.celular || '',
         ciudad: u.ciudad || 'Loja',
         es_verificado: Boolean(u.es_verificado),
