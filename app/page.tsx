@@ -42,6 +42,16 @@ interface MensajeItem {
   creado_en: string;
 }
 
+// LISTADO COMPLETO DE CIUDADES DEL ECUADOR
+const ciudadesEcuador = [
+  'Quito', 'Guayaquil', 'Cuenca', 'Santo Domingo', 'Machala', 'Durán', 'Manta',
+  'Portoviejo', 'Loja', 'Ambato', 'Esmeraldas', 'Quevedo', 'Riobamba', 'Milagro',
+  'Ibarra', 'La Libertad', 'Babahoyo', 'Sangolquí', 'Daule', 'Latacunga', 'Tulcán',
+  'Chone', 'Pasaje', 'Santa Rosa', 'Nueva Loja', 'Huaquillas', 'El Carmen',
+  'Montecristi', 'Samborondón', 'Puerto Baquerizo Moreno', 'Macas', 'Tena',
+  'Puyo', 'Zamora', 'Azogues', 'Guaranda', 'Salinas', 'Atacames', 'Gualaceo', 'Otavalo'
+];
+
 export default function QvendesHome() {
   const router = useRouter();
 
@@ -70,14 +80,13 @@ export default function QvendesHome() {
   const [mostrarModalVerificacion, setMostrarModalVerificacion] = useState(false);
   const [mostrarModalDenuncia, setMostrarModalDenuncia] = useState(false);
   const [mostrarModalChat, setMostrarModalChat] = useState(false);
-  const [vendedorVerPerfil, setVendedorVerPerfil] = useState<{ id: number; nombre: string; celular?: string; verificado: boolean } | null>(null);
 
   // ESTADOS DE FORMULARIO DE AUTH
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [authNombre, setAuthNombre] = useState('');
   const [authCelular, setAuthCelular] = useState('');
-  const [authCiudad, setAuthCiudad] = useState('Loja');
+  const [authCiudad, setAuthCiudad] = 'Loja';
   const [authError, setAuthError] = useState('');
   const [authProcesando, setAuthProcesando] = useState(false);
 
@@ -143,7 +152,6 @@ export default function QvendesHome() {
 
   useEffect(() => {
     cargarAnuncios();
-    // Recuperar sesión persistida en localStorage si existe
     const sesionGuardada = localStorage.getItem('qvendes_user');
     if (sesionGuardada) {
       try {
@@ -224,7 +232,6 @@ export default function QvendesHome() {
 
       if (res.ok) {
         setMostrarModalPublicar(false);
-        // Reset form
         setPubTitulo('');
         setPubPrecio('');
         setPubDescripcion('');
@@ -354,25 +361,28 @@ export default function QvendesHome() {
     alert('¡Enlace de la publicación copiado al portapapeles!');
   };
 
+  // COMPROBAR SI EL USUARIO ES EL ADMINISTRADOR EXCLUSIVO (soloescribeme@gmail.com)
+  const esAdministrador = user && user.email.toLowerCase() === 'soloescribeme@gmail.com';
+
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between pb-12 selection:bg-purple-500 selection:text-white">
+    <main className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between pb-12 selection:bg-amber-500 selection:text-slate-950">
       
-      {/* 🔮 ENCABEZADO / NAVBAR */}
-      <header className="border-b border-slate-850 bg-slate-950/80 backdrop-blur-md sticky top-0 z-40">
+      {/* 🔮 ENCABEZADO / NAVBAR (ESTÉTICA AMARILLA / DORADA AMBER) */}
+      <header className="border-b border-amber-500/20 bg-slate-950/90 backdrop-blur-md sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => router.push('/')}>
-            <img src="/logo.jpg" alt="Qvendes Logo" className="h-12 w-auto object-contain rounded-xl shadow-lg ring-1 ring-purple-500/30" />
+            <img src="/logo.jpg" alt="Qvendes Logo" className="h-12 w-auto object-contain rounded-xl shadow-lg ring-1 ring-amber-500/40" />
             <div>
               <span className="font-black text-xl tracking-tight text-white block leading-none">
-                Qvendes <span className="text-purple-400 font-extrabold">.app</span>
+                Qvendes <span className="text-amber-400 font-extrabold">.app</span>
               </span>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Marketplace Certificado</span>
+              <span className="text-[10px] font-bold text-amber-500/80 uppercase tracking-wider">Marketplace Recomendado</span>
             </div>
           </div>
 
           {/* BARRA DE BÚSQUEDA PRINCIPAL POR PALABRAS CLAVE */}
-          <form onSubmit={handleSearchSubmit} className="flex-1 max-w-xl hidden sm:flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-2xl px-4 py-2.5 shadow-inner focus-within:border-purple-500 transition-all">
-            <Search className="w-4 h-4 text-purple-400 shrink-0" />
+          <form onSubmit={handleSearchSubmit} className="flex-1 max-w-xl hidden sm:flex items-center gap-2 bg-slate-900 border border-amber-500/25 rounded-2xl px-4 py-2.5 shadow-inner focus-within:border-amber-400 transition-all">
+            <Search className="w-4 h-4 text-amber-400 shrink-0" />
             <input 
               type="text" 
               placeholder="Buscar autos, laptops, departamentos, servicios..."
@@ -380,40 +390,44 @@ export default function QvendesHome() {
               onChange={(e) => setBusqueda(e.target.value)}
               className="bg-transparent border-none text-xs text-white outline-none w-full font-medium placeholder-slate-500"
             />
-            <button type="submit" className="bg-purple-600 hover:bg-purple-500 text-white text-[10px] font-black uppercase px-3 py-1.5 rounded-xl shadow transition-all">
+            <button type="submit" className="bg-amber-500 hover:bg-amber-400 text-slate-950 text-[10px] font-black uppercase px-3.5 py-1.5 rounded-xl shadow transition-all">
               Buscar
             </button>
           </form>
 
           {/* ACCIONES DE USUARIO */}
           <div className="flex items-center gap-3">
-            <button 
-              type="button" 
-              onClick={() => router.push('/admin/patrocinadores')}
-              className="hidden lg:flex items-center gap-1.5 bg-slate-900 hover:bg-slate-850 border border-slate-800 text-purple-300 text-xs font-bold px-3 py-2 rounded-xl transition-all"
-            >
-              <ShieldCheck className="w-4 h-4 text-purple-400" />
-              Admin Patrocinados
-            </button>
+            
+            {/* BOTÓN ADMIN DE PATROCINADOS VISIBLE ÚNICAMENTE PARA soloescribeme@gmail.com */}
+            {esAdministrador && (
+              <button 
+                type="button" 
+                onClick={() => router.push('/admin/patrocinadores')}
+                className="hidden lg:flex items-center gap-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-bold px-3 py-2 rounded-xl transition-all shadow"
+              >
+                <ShieldCheck className="w-4 h-4 text-amber-400" />
+                Admin Patrocinados
+              </button>
+            )}
 
             {user ? (
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setMostrarModalPublicar(true)}
-                  className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-95 text-white text-xs font-black uppercase px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-1.5 transition-all"
+                  className="bg-gradient-to-r from-amber-500 via-yellow-500 to-orange-600 hover:opacity-95 text-slate-950 font-black text-xs uppercase px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-1.5 transition-all"
                 >
                   <Plus className="w-4 h-4" />
                   + Publicar Anuncio
                 </button>
 
-                <div className="bg-slate-900 border border-slate-800 p-2 rounded-xl flex items-center gap-2 text-xs">
-                  <div className="w-7 h-7 bg-purple-600 rounded-lg flex items-center justify-center font-black text-white uppercase text-xs">
+                <div className="bg-slate-900 border border-amber-500/20 p-2 rounded-xl flex items-center gap-2 text-xs">
+                  <div className="w-7 h-7 bg-amber-500 rounded-lg flex items-center justify-center font-black text-slate-950 uppercase text-xs">
                     {user.nombre.charAt(0)}
                   </div>
                   <div className="hidden sm:block text-left">
                     <span className="font-bold text-white block leading-none">{user.nombre}</span>
-                    <span className="text-[9px] text-emerald-400 font-bold flex items-center gap-1">
+                    <span className="text-[9px] text-amber-400 font-bold flex items-center gap-1">
                       {user.es_verificado ? '🛡️ Verificado' : '👤 Usuario Registrado'}
                     </span>
                   </div>
@@ -426,7 +440,7 @@ export default function QvendesHome() {
               <button
                 type="button"
                 onClick={() => { setModoAuth('login'); setMostrarModalAuth(true); }}
-                className="bg-purple-600 hover:bg-purple-500 text-white text-xs font-black uppercase px-5 py-2.5 rounded-xl shadow-lg flex items-center gap-2 transition-all"
+                className="bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black uppercase px-5 py-2.5 rounded-xl shadow-lg flex items-center gap-2 transition-all"
               >
                 <LogIn className="w-4 h-4" />
                 Ingresar / Registrarse
@@ -436,69 +450,62 @@ export default function QvendesHome() {
         </div>
       </header>
 
-      {/* BARRA DE FILTROS Y BÚSQUEDA MÓVIL */}
-      <div className="bg-slate-900/60 border-b border-slate-850 p-4 sticky top-20 z-30 backdrop-blur-md">
+      {/* BARRA DE FILTROS Y BÚSQUEDA */}
+      <div className="bg-slate-900/80 border-b border-amber-500/20 p-4 sticky top-20 z-30 backdrop-blur-md">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <button 
               type="button"
               onClick={() => setMostrarFiltrosAvanzados(!mostrarFiltrosAvanzados)}
-              className="bg-slate-850 hover:bg-slate-800 text-slate-200 border border-slate-750 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shrink-0"
+              className="bg-slate-950 hover:bg-slate-900 text-slate-200 border border-amber-500/30 px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shrink-0"
             >
-              <SlidersHorizontal className="w-4 h-4 text-purple-400" />
+              <SlidersHorizontal className="w-4 h-4 text-amber-400" />
               Filtros Avanzados {mostrarFiltrosAvanzados ? '▲' : '▼'}
             </button>
 
             {/* SELECCIÓN RÁPIDA DE CONDICIÓN */}
             <div className="flex items-center gap-1 overflow-x-auto text-[11px] font-bold">
-              <button type="button" onClick={() => { setFiltroCondicion(''); cargarAnuncios(); }} className={`px-3 py-1.5 rounded-xl border ${!filtroCondicion ? 'bg-purple-600 text-white border-purple-500' : 'bg-slate-950 text-slate-400 border-slate-800'}`}>
+              <button type="button" onClick={() => { setFiltroCondicion(''); cargarAnuncios(); }} className={`px-3 py-1.5 rounded-xl border ${!filtroCondicion ? 'bg-amber-500 text-slate-950 border-amber-400' : 'bg-slate-950 text-slate-400 border-slate-800'}`}>
                 Todos
               </button>
-              <button type="button" onClick={() => { setFiltroCondicion('nuevo'); cargarAnuncios(); }} className={`px-3 py-1.5 rounded-xl border ${filtroCondicion === 'nuevo' ? 'bg-purple-600 text-white border-purple-500' : 'bg-slate-950 text-slate-400 border-slate-800'}`}>
+              <button type="button" onClick={() => { setFiltroCondicion('nuevo'); cargarAnuncios(); }} className={`px-3 py-1.5 rounded-xl border ${filtroCondicion === 'nuevo' ? 'bg-amber-500 text-slate-950 border-amber-400' : 'bg-slate-950 text-slate-400 border-slate-800'}`}>
                 Nuevos
               </button>
-              <button type="button" onClick={() => { setFiltroCondicion('usado'); cargarAnuncios(); }} className={`px-3 py-1.5 rounded-xl border ${filtroCondicion === 'usado' ? 'bg-purple-600 text-white border-purple-500' : 'bg-slate-950 text-slate-400 border-slate-800'}`}>
+              <button type="button" onClick={() => { setFiltroCondicion('usado'); cargarAnuncios(); }} className={`px-3 py-1.5 rounded-xl border ${filtroCondicion === 'usado' ? 'bg-amber-500 text-slate-950 border-amber-400' : 'bg-slate-950 text-slate-400 border-slate-800'}`}>
                 Usados
               </button>
-              <button type="button" onClick={() => { setFiltroCondicion('servicio'); cargarAnuncios(); }} className={`px-3 py-1.5 rounded-xl border ${filtroCondicion === 'servicio' ? 'bg-purple-600 text-white border-purple-500' : 'bg-slate-950 text-slate-400 border-slate-800'}`}>
+              <button type="button" onClick={() => { setFiltroCondicion('servicio'); cargarAnuncios(); }} className={`px-3 py-1.5 rounded-xl border ${filtroCondicion === 'servicio' ? 'bg-amber-500 text-slate-950 border-amber-400' : 'bg-slate-950 text-slate-400 border-slate-800'}`}>
                 Servicios
               </button>
             </div>
-          </div>
-
-          <div className="text-xs text-slate-400 font-medium">
-            Mostrando publicaciones activas en orden <strong className="text-purple-400">aleatorio rándom</strong> para equidad.
           </div>
         </div>
 
         {/* PANEL DESPLEGABLE DE FILTROS COMBINABLES O INDIVIDUALES */}
         {mostrarFiltrosAvanzados && (
-          <form onSubmit={handleSearchSubmit} className="max-w-7xl mx-auto pt-4 mt-3 border-t border-slate-800 grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs animate-in fade-in duration-200">
+          <form onSubmit={handleSearchSubmit} className="max-w-7xl mx-auto pt-4 mt-3 border-t border-amber-500/20 grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs animate-in fade-in duration-200">
             <div>
-              <label className="block text-[10px] font-black uppercase text-slate-400 mb-1">Ciudad / Ubicación</label>
+              <label className="block text-[10px] font-black uppercase text-amber-400 mb-1">Ciudad del Ecuador</label>
               <select value={filtroCiudad} onChange={(e) => setFiltroCiudad(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-bold">
-                <option value="">Todas las ciudades</option>
-                <option value="Loja">Loja</option>
-                <option value="Quito">Quito</option>
-                <option value="Guayaquil">Guayaquil</option>
-                <option value="Cuenca">Cuenca</option>
-                <option value="Ambato">Ambato</option>
-                <option value="Machala">Machala</option>
+                <option value="">Todas las ciudades del Ecuador</option>
+                {ciudadesEcuador.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
               </select>
             </div>
 
             <div>
-              <label className="block text-[10px] font-black uppercase text-slate-400 mb-1">Precio Mínimo ($)</label>
+              <label className="block text-[10px] font-black uppercase text-amber-400 mb-1">Precio Mínimo ($)</label>
               <input type="number" placeholder="Ej. 10" value={filtroPrecioMin} onChange={(e) => setFiltroPrecioMin(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-bold outline-none" />
             </div>
 
             <div>
-              <label className="block text-[10px] font-black uppercase text-slate-400 mb-1">Precio Máximo ($)</label>
+              <label className="block text-[10px] font-black uppercase text-amber-400 mb-1">Precio Máximo ($)</label>
               <input type="number" placeholder="Ej. 1500" value={filtroPrecioMax} onChange={(e) => setFiltroPrecioMax(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-bold outline-none" />
             </div>
 
             <div className="flex items-end gap-2">
-              <button type="submit" className="flex-1 bg-purple-600 hover:bg-purple-500 text-white font-black text-xs uppercase py-2.5 rounded-xl shadow">
+              <button type="submit" className="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs uppercase py-2.5 rounded-xl shadow">
                 Aplicar Filtros
               </button>
               <button type="button" onClick={() => { setFiltroCiudad(''); setFiltroCondicion(''); setFiltroPrecioMin(''); setFiltroPrecioMax(''); setBusqueda(''); cargarAnuncios(); }} className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-2.5 rounded-xl font-bold">
@@ -525,7 +532,7 @@ export default function QvendesHome() {
                 <div 
                   key={a.id} 
                   onClick={() => { setAnuncioDetalle(a); setFotoSeleccionadaIndex(0); }}
-                  className="bg-slate-900 border-2 border-amber-500/40 rounded-3xl overflow-hidden shadow-2xl hover:scale-105 transition-all cursor-pointer relative group flex flex-col justify-between"
+                  className="bg-slate-900 border-2 border-amber-500/50 rounded-3xl overflow-hidden shadow-2xl hover:scale-105 transition-all cursor-pointer relative group flex flex-col justify-between"
                 >
                   <div className="absolute top-3 left-3 bg-gradient-to-r from-amber-500 to-yellow-500 text-slate-950 font-black text-[9px] uppercase px-3 py-1 rounded-full shadow-lg z-10">
                     ⭐ TOP DESTACADO
@@ -535,26 +542,26 @@ export default function QvendesHome() {
                     {a.foto1 ? (
                       <img src={a.foto1} alt={a.titulo} className="w-full h-full object-cover group-hover:scale-110 transition-all duration-300" />
                     ) : (
-                      <div className="text-3xl text-purple-400">🛍️</div>
+                      <div className="text-3xl text-amber-400">🛍️</div>
                     )}
                   </div>
 
                   <div className="p-4 space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-emerald-400 font-black text-base font-mono">${Number(a.precio).toFixed(2)} USD</span>
+                      <span className="text-amber-400 font-black text-base font-mono">${Number(a.precio).toFixed(2)} USD</span>
                       <span className="bg-slate-800 text-slate-300 text-[9px] font-bold uppercase px-2 py-0.5 rounded-lg border border-slate-750">
                         {a.condicion}
                       </span>
                     </div>
 
-                    <h3 className="font-black text-white text-sm line-clamp-1 group-hover:text-purple-300 transition-all">{a.titulo}</h3>
+                    <h3 className="font-black text-white text-sm line-clamp-1 group-hover:text-amber-300 transition-all">{a.titulo}</h3>
                     
                     <div className="flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-850 pt-2">
                       <span className="flex items-center gap-1 font-bold text-white">
-                        <MapPin className="w-3 h-3 text-purple-400" /> {a.ciudad}
+                        <MapPin className="w-3 h-3 text-amber-400" /> {a.ciudad}
                       </span>
                       {a.vendedor_verificado && (
-                        <span className="text-emerald-400 font-bold flex items-center gap-0.5">
+                        <span className="text-amber-400 font-bold flex items-center gap-0.5">
                           🛡️ Verificado
                         </span>
                       )}
@@ -566,20 +573,19 @@ export default function QvendesHome() {
           </section>
         )}
 
-        {/* FEED DE ANUNCIOS REGULARES CON ORDEN ALEATORIO RÁNDOM */}
+        {/* FEED DE ANUNCIOS REGULARES */}
         <section className="space-y-4">
-          <div className="flex items-center justify-between border-b border-slate-850 pb-3">
+          <div className="flex items-center justify-between border-b border-amber-500/20 pb-3">
             <h2 className="text-base font-black text-white uppercase tracking-wider flex items-center gap-2">
               🛍️ Explorar Publicaciones ({anunciosFeed.length})
             </h2>
-            <span className="text-xs text-purple-400 font-mono font-bold">Rotación Rándom Equitativa</span>
           </div>
 
           {cargandoAnuncios ? (
             <p className="text-center text-xs text-slate-400 py-16">Cargando catálogo de productos y servicios...</p>
           ) : anunciosFeed.length === 0 ? (
             <div className="text-center py-16 space-y-3 bg-slate-900/40 rounded-3xl border border-slate-850">
-              <div className="text-4xl text-purple-400">🔍</div>
+              <div className="text-4xl text-amber-400">🔍</div>
               <h3 className="text-base font-black text-white uppercase">No se encontraron publicaciones</h3>
               <p className="text-xs text-slate-400">Intenta cambiar las palabras clave o ajustar los filtros de precio y ciudad.</p>
             </div>
@@ -589,7 +595,7 @@ export default function QvendesHome() {
                 <div 
                   key={a.id}
                   onClick={() => { setAnuncioDetalle(a); setFotoSeleccionadaIndex(0); }}
-                  className="bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-xl hover:border-slate-700 hover:-translate-y-1 transition-all cursor-pointer group flex flex-col justify-between"
+                  className="bg-slate-900 border border-amber-500/20 hover:border-amber-500/50 rounded-3xl overflow-hidden shadow-xl hover:-translate-y-1 transition-all cursor-pointer group flex flex-col justify-between"
                 >
                   <div className="h-48 bg-slate-950 relative flex items-center justify-center overflow-hidden">
                     {a.foto1 ? (
@@ -610,22 +616,22 @@ export default function QvendesHome() {
                   <div className="p-4 space-y-2 flex-1 flex flex-col justify-between">
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between">
-                        <span className="text-emerald-400 font-black text-lg font-mono">${Number(a.precio).toFixed(2)}</span>
+                        <span className="text-amber-400 font-black text-lg font-mono">${Number(a.precio).toFixed(2)}</span>
                         <span className="bg-slate-950 text-slate-300 text-[9px] font-bold uppercase px-2.5 py-0.5 rounded-full border border-slate-800">
                           {a.condicion}
                         </span>
                       </div>
 
-                      <h3 className="font-black text-white text-sm line-clamp-2 leading-snug group-hover:text-purple-300 transition-all">{a.titulo}</h3>
+                      <h3 className="font-black text-white text-sm line-clamp-2 leading-snug group-hover:text-amber-300 transition-all">{a.titulo}</h3>
                     </div>
 
                     <div className="pt-2 border-t border-slate-850 flex items-center justify-between text-[11px]">
                       <span className="text-slate-400 font-bold flex items-center gap-1">
-                        <MapPin className="w-3.5 h-3.5 text-purple-400" /> {a.ciudad}
+                        <MapPin className="w-3.5 h-3.5 text-amber-400" /> {a.ciudad}
                       </span>
 
                       {a.vendedor_verificado ? (
-                        <span className="text-emerald-400 font-bold flex items-center gap-1 text-[10px]">
+                        <span className="text-amber-400 font-bold flex items-center gap-1 text-[10px]">
                           🛡️ Verificado
                         </span>
                       ) : (
@@ -644,11 +650,11 @@ export default function QvendesHome() {
       {/* 👁️ MODAL DETALLE COMPLETO DEL ANUNCIO */}
       {anuncioDetalle && (
         <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-4xl w-full p-6 sm:p-8 my-8 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-slate-900 border border-amber-500/30 rounded-3xl max-w-4xl w-full p-6 sm:p-8 my-8 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto">
             
             <div className="flex items-center justify-between border-b border-slate-850 pb-4">
               <div>
-                <span className="bg-purple-500/10 text-purple-400 border border-purple-500/20 text-[10px] font-mono font-black uppercase px-3 py-1 rounded-full">
+                <span className="bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[10px] font-mono font-black uppercase px-3 py-1 rounded-full">
                   Publicación ID #{anuncioDetalle.id}
                 </span>
                 <h2 className="text-xl font-black text-white uppercase mt-1">{anuncioDetalle.titulo}</h2>
@@ -683,7 +689,7 @@ export default function QvendesHome() {
                       src={img}
                       alt={`Foto ${idx+1}`}
                       onClick={() => setFotoSeleccionadaIndex(idx)}
-                      className={`h-16 w-full object-cover rounded-xl border cursor-pointer ${fotoSeleccionadaIndex === idx ? 'border-purple-500 ring-2 ring-purple-500/40' : 'border-slate-800'}`}
+                      className={`h-16 w-full object-cover rounded-xl border cursor-pointer ${fotoSeleccionadaIndex === idx ? 'border-amber-400 ring-2 ring-amber-400/40' : 'border-slate-800'}`}
                     />
                   ))}
                 </div>
@@ -694,7 +700,7 @@ export default function QvendesHome() {
                 <div className="bg-slate-950 p-4 rounded-2xl border border-slate-850 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-slate-400 font-bold uppercase text-[10px]">Precio de Venta</span>
-                    <strong className="text-emerald-400 font-black text-2xl font-mono">${Number(anuncioDetalle.precio).toFixed(2)} USD</strong>
+                    <strong className="text-amber-400 font-black text-2xl font-mono">${Number(anuncioDetalle.precio).toFixed(2)} USD</strong>
                   </div>
                   
                   <div className="flex items-center justify-between border-t border-slate-900 pt-2 text-slate-300 font-medium">
@@ -704,7 +710,7 @@ export default function QvendesHome() {
 
                   <div className="flex items-center justify-between border-t border-slate-900 pt-2 text-slate-300 font-medium">
                     <span>Ubicación:</span>
-                    <strong className="text-purple-300 font-bold">{anuncioDetalle.ciudad}, Ecuador</strong>
+                    <strong className="text-amber-300 font-bold">{anuncioDetalle.ciudad}, Ecuador</strong>
                   </div>
                 </div>
 
@@ -722,15 +728,15 @@ export default function QvendesHome() {
                 </div>
 
                 {/* TARJETA DEL VENDEDOR & SECCIÓN DE CONTACTO */}
-                <div className="bg-slate-950 p-4 rounded-2xl border border-purple-500/30 space-y-3">
+                <div className="bg-slate-950 p-4 rounded-2xl border border-amber-500/30 space-y-3">
                   <div className="flex items-center justify-between">
                     <div>
-                      <span className="text-[9px] text-purple-400 font-bold uppercase block">Vendedor del Producto:</span>
+                      <span className="text-[9px] text-amber-400 font-bold uppercase block">Vendedor del Producto:</span>
                       <strong className="text-white text-sm font-black uppercase">{anuncioDetalle.vendedor_nombre}</strong>
                     </div>
 
                     {anuncioDetalle.vendedor_verificado ? (
-                      <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-black uppercase px-3 py-1 rounded-full shadow">
+                      <span className="bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-black uppercase px-3 py-1 rounded-full shadow">
                         🛡️ Vendedor Verificado
                       </span>
                     ) : (
@@ -762,7 +768,7 @@ export default function QvendesHome() {
                             setMostrarModalChat(true);
                             cargarMensajesInternos(anuncioDetalle.id);
                           }}
-                          className="flex-1 bg-purple-600 hover:bg-purple-500 text-white font-black text-xs uppercase py-3 rounded-xl shadow flex items-center justify-center gap-1.5"
+                          className="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs uppercase py-3 rounded-xl shadow flex items-center justify-center gap-1.5"
                         >
                           <MessageSquare className="w-4 h-4" />
                           Chat 100% Interno
@@ -777,7 +783,7 @@ export default function QvendesHome() {
                       <button
                         type="button"
                         onClick={() => { setModoAuth('login'); setMostrarModalAuth(true); }}
-                        className="w-full bg-purple-600 hover:bg-purple-500 text-white font-black text-[11px] uppercase py-2 rounded-xl"
+                        className="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[11px] uppercase py-2 rounded-xl"
                       >
                         Inicia Sesión para Ver Teléfono y Chatear ➡️
                       </button>
@@ -815,13 +821,12 @@ export default function QvendesHome() {
           <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-lg w-full p-6 space-y-4 shadow-2xl flex flex-col h-[500px]">
             <div className="flex justify-between items-center border-b border-slate-850 pb-3">
               <div>
-                <span className="text-[10px] font-black uppercase text-purple-400">Chat Interno Exclusivo</span>
+                <span className="text-[10px] font-black uppercase text-amber-400">Chat Interno Exclusivo</span>
                 <h3 className="font-black text-white text-sm uppercase">{anuncioDetalle.titulo}</h3>
               </div>
               <button type="button" onClick={() => setMostrarModalChat(false)} className="text-slate-400 hover:text-white text-xs font-bold">✕ Cerrar</button>
             </div>
 
-            {/* HILO DE MENSAJES */}
             <div className="flex-1 bg-slate-950 rounded-2xl border border-slate-850 p-4 overflow-y-auto space-y-3 text-xs">
               {mensajesChat.length === 0 ? (
                 <p className="text-center text-slate-500 py-8">Aún no hay mensajes. ¡Envía tu consulta al vendedor!</p>
@@ -831,7 +836,7 @@ export default function QvendesHome() {
                   return (
                     <div key={m.id} className={`flex flex-col ${esMio ? 'items-end' : 'items-start'}`}>
                       <span className="text-[9px] text-slate-500 font-bold mb-0.5">{m.emisor_nombre}</span>
-                      <div className={`p-3 rounded-2xl max-w-[80%] ${esMio ? 'bg-purple-600 text-white rounded-br-none' : 'bg-slate-850 text-slate-200 rounded-bl-none'}`}>
+                      <div className={`p-3 rounded-2xl max-w-[80%] ${esMio ? 'bg-amber-500 text-slate-950 font-medium rounded-br-none' : 'bg-slate-850 text-slate-200 rounded-bl-none'}`}>
                         {m.mensaje}
                       </div>
                     </div>
@@ -847,12 +852,12 @@ export default function QvendesHome() {
                 placeholder="Escribe tu mensaje privado..."
                 value={nuevoMensaje}
                 onChange={(e) => setNuevoMensaje(e.target.value)}
-                className="flex-1 bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white outline-none focus:border-purple-500"
+                className="flex-1 bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white outline-none focus:border-amber-400"
               />
               <button
                 type="submit"
                 disabled={enviandoMensaje}
-                className="bg-purple-600 hover:bg-purple-500 text-white p-3 rounded-xl font-bold"
+                className="bg-amber-500 hover:bg-amber-400 text-slate-950 p-3 rounded-xl font-bold"
               >
                 <Send className="w-4 h-4" />
               </button>
@@ -873,7 +878,7 @@ export default function QvendesHome() {
             </div>
 
             {denunciaEnviada ? (
-              <p className="text-center text-emerald-400 font-bold py-6">✅ ¡Gracias! Tu reporte ha sido enviado al equipo de seguridad de Qvendes.</p>
+              <p className="text-center text-amber-400 font-bold py-6">✅ ¡Gracias! Tu reporte ha sido enviado al equipo de seguridad de Qvendes.</p>
             ) : (
               <form onSubmit={handleEnviarDenuncia} className="space-y-4 text-xs">
                 <div>
@@ -903,7 +908,7 @@ export default function QvendesHome() {
       {/* 🔐 MODAL AUTH (LOGIN / REGISTRO COMÚN) */}
       {mostrarModalAuth && (
         <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 sm:p-8 space-y-5 shadow-2xl">
+          <div className="bg-slate-900 border border-amber-500/30 rounded-3xl max-w-md w-full p-6 sm:p-8 space-y-5 shadow-2xl">
             <div className="flex justify-between items-center border-b border-slate-850 pb-3">
               <h3 className="font-black text-white uppercase text-base">
                 {modoAuth === 'login' ? '🔑 Iniciar Sesión en Qvendes' : '📝 Registro de Usuario Común'}
@@ -921,37 +926,41 @@ export default function QvendesHome() {
               {modoAuth === 'register' && (
                 <>
                   <div>
-                    <label className="block text-[10px] font-black uppercase text-slate-400 mb-1">Nombres Completos *</label>
+                    <label className="block text-[10px] font-black uppercase text-amber-400 mb-1">Nombres Completos *</label>
                     <input type="text" required value={authNombre} onChange={(e) => setAuthNombre(e.target.value)} placeholder="Ej. Juan Pérez" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white outline-none font-bold" />
                   </div>
 
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="block text-[10px] font-black uppercase text-slate-400 mb-1">Teléfono / Celular</label>
+                      <label className="block text-[10px] font-black uppercase text-amber-400 mb-1">Teléfono / Celular</label>
                       <input type="text" value={authCelular} onChange={(e) => setAuthCelular(e.target.value)} placeholder="Ej. 0991234567" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white outline-none" />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-black uppercase text-slate-400 mb-1">Ciudad *</label>
-                      <input type="text" required value={authCiudad} onChange={(e) => setAuthCiudad(e.target.value)} placeholder="Ej. Loja" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white outline-none" />
+                      <label className="block text-[10px] font-black uppercase text-amber-400 mb-1">Ciudad *</label>
+                      <select value={authCiudad} onChange={(e) => setAuthCiudad(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold">
+                        {ciudadesEcuador.map(c => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                 </>
               )}
 
               <div>
-                <label className="block text-[10px] font-black uppercase text-slate-400 mb-1">Correo Electrónico *</label>
+                <label className="block text-[10px] font-black uppercase text-amber-400 mb-1">Correo Electrónico *</label>
                 <input type="email" required value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} placeholder="correo@ejemplo.com" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white outline-none font-bold" />
               </div>
 
               <div>
-                <label className="block text-[10px] font-black uppercase text-slate-400 mb-1">Contraseña *</label>
+                <label className="block text-[10px] font-black uppercase text-amber-400 mb-1">Contraseña *</label>
                 <input type="password" required value={authPassword} onChange={(e) => setAuthPassword(e.target.value)} placeholder="••••••••" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white outline-none font-bold" />
               </div>
 
               <button
                 type="submit"
                 disabled={authProcesando}
-                className="w-full bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-black py-3.5 rounded-xl uppercase text-xs tracking-wider shadow-lg transition-all"
+                className="w-full bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-slate-950 font-black py-3.5 rounded-xl uppercase text-xs tracking-wider shadow-lg transition-all"
               >
                 {authProcesando ? 'Procesando...' : modoAuth === 'login' ? 'Ingresar a mi Cuenta' : 'Crear mi Cuenta Común'}
               </button>
@@ -959,11 +968,11 @@ export default function QvendesHome() {
 
             <div className="text-center pt-2 border-t border-slate-850 text-xs">
               {modoAuth === 'login' ? (
-                <button type="button" onClick={() => setModoAuth('register')} className="text-purple-400 hover:underline font-bold">
+                <button type="button" onClick={() => setModoAuth('register')} className="text-amber-400 hover:underline font-bold">
                   ¿No tienes cuenta? Registrate gratis aquí
                 </button>
               ) : (
-                <button type="button" onClick={() => setModoAuth('login')} className="text-purple-400 hover:underline font-bold">
+                <button type="button" onClick={() => setModoAuth('login')} className="text-amber-400 hover:underline font-bold">
                   ¿Ya tienes cuenta? Inicia sesión aquí
                 </button>
               )}
@@ -975,28 +984,28 @@ export default function QvendesHome() {
       {/* ➕ MODAL PUBLICAR ANUNCIO */}
       {mostrarModalPublicar && user && (
         <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-2xl w-full p-6 sm:p-8 space-y-4 my-8 shadow-2xl">
+          <div className="bg-slate-900 border border-amber-500/30 rounded-3xl max-w-2xl w-full p-6 sm:p-8 space-y-4 my-8 shadow-2xl">
             <div className="flex justify-between items-center border-b border-slate-850 pb-3">
               <h3 className="font-black text-white uppercase text-base flex items-center gap-2">
-                <Plus className="w-5 h-5 text-purple-400" /> Publicar Nuevo Anuncio
+                <Plus className="w-5 h-5 text-amber-400" /> Publicar Nuevo Anuncio
               </h3>
               <button type="button" onClick={() => setMostrarModalPublicar(false)} className="text-slate-400 hover:text-white text-xs font-bold">✕ Cerrar</button>
             </div>
 
             <form onSubmit={handlePublicarSubmit} className="space-y-4 text-xs">
               <div>
-                <label className="block text-[10px] font-black uppercase text-slate-400 mb-1">Título del Anuncio *</label>
+                <label className="block text-[10px] font-black uppercase text-amber-400 mb-1">Título del Anuncio *</label>
                 <input type="text" required value={pubTitulo} onChange={(e) => setPubTitulo(e.target.value)} placeholder="Ej. Laptop Asus Core i7 16GB RAM semi nueva" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white outline-none font-bold" />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-[10px] font-black uppercase text-slate-400 mb-1">Precio ($ USD) *</label>
+                  <label className="block text-[10px] font-black uppercase text-amber-400 mb-1">Precio ($ USD) *</label>
                   <input type="number" step="0.50" required value={pubPrecio} onChange={(e) => setPubPrecio(e.target.value)} placeholder="Ej. 450.00" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold outline-none" />
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-black uppercase text-slate-400 mb-1">Estado / Condición *</label>
+                  <label className="block text-[10px] font-black uppercase text-amber-400 mb-1">Estado / Condición *</label>
                   <select value={pubCondicion} onChange={(e) => setPubCondicion(e.target.value as any)} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold">
                     <option value="nuevo">Nuevo</option>
                     <option value="usado">Usado</option>
@@ -1005,19 +1014,23 @@ export default function QvendesHome() {
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-black uppercase text-slate-400 mb-1">Ciudad *</label>
-                  <input type="text" required value={pubCiudad} onChange={(e) => setPubCiudad(e.target.value)} placeholder="Ej. Loja" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold" />
+                  <label className="block text-[10px] font-black uppercase text-amber-400 mb-1">Ciudad *</label>
+                  <select value={pubCiudad} onChange={(e) => setPubCiudad(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white font-bold">
+                    {ciudadesEcuador.map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
               <div>
-                <label className="block text-[10px] font-black uppercase text-slate-400 mb-1">Descripción Ampliada *</label>
+                <label className="block text-[10px] font-black uppercase text-amber-400 mb-1">Descripción Ampliada *</label>
                 <textarea rows={3} required value={pubDescripcion} onChange={(e) => setPubDescripcion(e.target.value)} placeholder="Describe las características técnicas, motivo de venta o detalles de contacto..." className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white outline-none" />
               </div>
 
               {/* FOTOS BASE64 */}
               <div className="space-y-2">
-                <label className="block text-[10px] font-black uppercase text-slate-400">Fotos del Producto (Hasta 4 fotos)</label>
+                <label className="block text-[10px] font-black uppercase text-amber-400">Fotos del Producto (Hasta 4 fotos)</label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {[setPubFoto1, setPubFoto2, setPubFoto3, setPubFoto4].map((setter, idx) => (
                     <input 
@@ -1034,7 +1047,7 @@ export default function QvendesHome() {
                           reader.readAsDataURL(file);
                         }
                       }}
-                      className="text-[9px] text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-[9px] file:font-black file:bg-purple-600 file:text-white" 
+                      className="text-[9px] text-slate-400 file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-[9px] file:font-black file:bg-amber-500 file:text-slate-950" 
                     />
                   ))}
                 </div>
@@ -1043,7 +1056,7 @@ export default function QvendesHome() {
               <button
                 type="submit"
                 disabled={pubProcesando}
-                className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-95 text-white font-black py-4 rounded-xl text-xs uppercase shadow-lg transition-all"
+                className="w-full bg-gradient-to-r from-amber-500 via-yellow-500 to-orange-600 hover:opacity-95 text-slate-950 font-black py-4 rounded-xl text-xs uppercase shadow-lg transition-all"
               >
                 {pubProcesando ? 'Publicando...' : '✅ Publicar en Qvendes'}
               </button>
@@ -1053,7 +1066,7 @@ export default function QvendesHome() {
       )}
 
       {/* FOOTER */}
-      <footer className="border-t border-slate-850 py-6 text-center text-xs text-slate-500 mt-12">
+      <footer className="border-t border-amber-500/20 py-6 text-center text-xs text-slate-500 mt-12">
         <p>© {new Date().getFullYear()} Qvendes Marketplace. Plataforma oficial de la suite LatinRed.</p>
       </footer>
 

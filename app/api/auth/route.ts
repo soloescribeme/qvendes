@@ -7,7 +7,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { action, email, password, nombre, celular, ciudad, usuario_id, documento_cedula, foto_cedula, foto_servicio_basico, foto_selfie_cedula, direccion_fisica } = body;
 
-    // 1. INICIALIZAR TABLAS EN NEON DB SI NO EXISTEN
+    // 1. INICIALIZAR Y MIGRAR COLUMNAS EN NEON DB SI ES NECESARIO
     try {
       await sql`
         CREATE TABLE IF NOT EXISTS perfiles (
@@ -28,8 +28,19 @@ export async function POST(request: Request) {
           creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
       `;
+      
+      // Auto-migraciones por si la tabla existía previamente con menos columnas
+      await sql`ALTER TABLE perfiles ADD COLUMN IF NOT EXISTS celular VARCHAR(50)`;
+      await sql`ALTER TABLE perfiles ADD COLUMN IF NOT EXISTS ciudad VARCHAR(100)`;
+      await sql`ALTER TABLE perfiles ADD COLUMN IF NOT EXISTS es_verificado BOOLEAN DEFAULT false`;
+      await sql`ALTER TABLE perfiles ADD COLUMN IF NOT EXISTS documento_cedula VARCHAR(100)`;
+      await sql`ALTER TABLE perfiles ADD COLUMN IF NOT EXISTS foto_cedula TEXT`;
+      await sql`ALTER TABLE perfiles ADD COLUMN IF NOT EXISTS foto_servicio_basico TEXT`;
+      await sql`ALTER TABLE perfiles ADD COLUMN IF NOT EXISTS foto_selfie_cedula TEXT`;
+      await sql`ALTER TABLE perfiles ADD COLUMN IF NOT EXISTS direccion_fisica TEXT`;
+      await sql`ALTER TABLE perfiles ADD COLUMN IF NOT EXISTS saldo_billetera NUMERIC(10, 2) DEFAULT 0.00`;
     } catch (e) {
-      console.warn('Tabla perfiles ya existente o error de creacion:', e);
+      console.warn('Verificacion de columnas de perfiles:', e);
     }
 
     // 2. REGISTRO DE USUARIO COMÚN (Nombres, Ciudad, Teléfono, Correo, Password)
@@ -41,17 +52,28 @@ export async function POST(request: Request) {
       const emailLower = email.trim().toLowerCase();
       const existentes = await sql`SELECT id FROM perfiles WHERE LOWER(email) = ${emailLower}`;
       if (existentes.length > 0) {
-        return NextResponse.json({ error: 'El correo electrónico ya está registrado.' }, { status: 400 });
+        return NextResponse.json({ error: 'El correo electrónico ya está registrado. Por favor inicia sesión.' }, { status: 400 });
       }
 
       const hash = await bcrypt.hash(password, 10);
       const insertado = await sql`
-        INSERT INTO perfiles (email, password_hash, nombre, celular, ciudad)
-        VALUES (${emailLower}, ${hash}, ${nombre}, ${celular || ''}, ${ciudad || 'Loja'})
+        INSERT INTO perfiles (email, password_hash, nombre, celular, ciudad, es_verificado, saldo_billetera)
+        VALUES (${emailLower}, ${hash}, ${nombre}, ${celular || ''}, ${ciudad || 'Loja'}, false, 0.00)
         RETURNING id, email, nombre, celular, ciudad, es_verificado, saldo_billetera
       `;
 
-      return NextResponse.json({ success: true, user: insertado[0] });
+      const u = insertado[0];
+      const usuarioCreado = {
+        id: u.id,
+        email: u.email,
+        nombre: u.nombre,
+        celular: u.celular || '',
+        ciudad: u.ciudad || 'Loja',
+        es_verificado: Boolean(u.es_verificado),
+        saldo_billetera: u.saldo_billetera ? parseFloat(u.saldo_billetera) : 0
+      };
+
+      return NextResponse.json({ success: true, user: usuarioCreado });
     }
 
     // 3. INICIO DE SESIÓN
@@ -61,7 +83,7 @@ export async function POST(request: Request) {
       }
 
       const emailLower = email.trim().toLowerCase();
-      const registros = await sql`SELECT * FROM perfiles WHERE LOWER(email) = ${emailLower}`;
+      const registros = await sql`SELECT id, email, password_hash, nombre, celular, ciudad, es_verificado, saldo_billetera FROM perfiles WHERE LOWER(email) = ${emailLower}`;
       if (registros.length === 0) {
         return NextResponse.json({ error: 'Credenciales incorrectas o usuario no registrado.' }, { status: 401 });
       }
@@ -69,17 +91,17 @@ export async function POST(request: Request) {
       const u = registros[0];
       const esValido = await bcrypt.compare(password, u.password_hash);
       if (!esValido) {
-        return NextResponse.json({ error: 'Contraseña incorrecta.' }, { status: 401 });
+        return NextResponse.json({ error: 'Contraseña incorrecta. Por favor verifica tus datos.' }, { status: 401 });
       }
 
       const usuarioLimpio = {
         id: u.id,
         email: u.email,
         nombre: u.nombre,
-        celular: u.celular,
-        ciudad: u.ciudad,
-        es_verificado: u.es_verificado,
-        saldo_billetera: u.saldo_billetera
+        celular: u.celular || '',
+        ciudad: u.ciudad || 'Loja',
+        es_verificado: Boolean(u.es_verificado),
+        saldo_billetera: u.saldo_billetera ? parseFloat(u.saldo_billetera) : 0
       };
 
       return NextResponse.json({ success: true, user: usuarioLimpio });
@@ -102,12 +124,12 @@ export async function POST(request: Request) {
         WHERE id = ${parseInt(usuario_id)}
       `;
 
-      return NextResponse.json({ success: true, message: '¡Formulario de verificación enviado exitosamente! Insignia asignada.' });
+      return NextResponse.json({ success: true, message: '¡Formulario de verificación enviado exitosamente!' });
     }
 
     return NextResponse.json({ error: 'Acción no válida.' }, { status: 400 });
   } catch (error) {
-    console.error('Error en API Auth de Qvendes:', error);
-    return NextResponse.json({ error: 'Error al procesar la solicitud en el servidor.' }, { status: 500 });
+    console.error('Error detallado en API Auth de Qvendes:', error);
+    return NextResponse.json({ error: 'Error al procesar la solicitud en el servidor. Intenta de nuevo.' }, { status: 500 });
   }
 }
