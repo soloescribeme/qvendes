@@ -86,7 +86,7 @@ export default function QvendesHome() {
   const [authPassword, setAuthPassword] = useState('');
   const [authNombre, setAuthNombre] = useState('');
   const [authCelular, setAuthCelular] = useState('');
-  const [authCiudad, setAuthCiudad] = 'Loja';
+  const [authCiudad, setAuthCiudad] = useState('Loja');
   const [authError, setAuthError] = useState('');
   const [authProcesando, setAuthProcesando] = useState(false);
 
