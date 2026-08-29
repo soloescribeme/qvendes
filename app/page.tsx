@@ -6,7 +6,7 @@ import {
   Search, Plus, ShieldCheck, Heart, Share2, MessageSquare, Tag, Flag, 
   MapPin, CheckCircle2, Lock, User, Star, SlidersHorizontal, Sparkles, 
   LogOut, LogIn, UserCheck, X, Camera, DollarSign, Send, Phone, MessageCircle,
-  Eye, EyeOff
+  Eye, EyeOff, Save, Check
 } from 'lucide-react';
 
 interface Anuncio {
@@ -78,7 +78,7 @@ export default function QvendesHome() {
   const [mostrarModalAuth, setMostrarModalAuth] = useState(false);
   const [modoAuth, setModoAuth] = useState<'login' | 'register'>('login');
   const [mostrarModalPublicar, setMostrarModalPublicar] = useState(false);
-  const [mostrarModalVerificacion, setMostrarModalVerificacion] = useState(false);
+  const [mostrarModalPerfil, setMostrarModalPerfil] = useState(false);
   const [mostrarModalDenuncia, setMostrarModalDenuncia] = useState(false);
   const [mostrarModalChat, setMostrarModalChat] = useState(false);
 
@@ -94,6 +94,14 @@ export default function QvendesHome() {
   const [authError, setAuthError] = useState('');
   const [authProcesando, setAuthProcesando] = useState(false);
 
+  // ESTADOS DE FORMULARIO DE PERFIL DE USUARIO
+  const [editNombre, setEditNombre] = useState('');
+  const [editCelular, setEditCelular] = useState('');
+  const [editCiudad, setEditCiudad] = useState('Loja');
+  const [editPassword, setEditPassword] = useState('');
+  const [editExito, setEditExito] = useState(false);
+  const [editProcesando, setEditProcesando] = useState(false);
+
   // ESTADOS DE FORMULARIO DE PUBLICACIÓN
   const [pubTitulo, setPubTitulo] = useState('');
   const [pubPrecio, setPubPrecio] = useState('');
@@ -108,6 +116,7 @@ export default function QvendesHome() {
   const [pubMetodosPago, setPubMetodosPago] = useState('Efectivo / Transferencia Directa / Escrow Platform');
   const [pubMetodosEnvio, setPubMetodosEnvio] = useState('Entrega personal o Envío a provincias');
   const [pubProcesando, setPubProcesando] = useState(false);
+  const [pubExitoMensaje, setPubExitoMensaje] = useState(false);
 
   // CHAT INTERNO 100% EXCLUSIVO
   const [mensajesChat, setMensajesChat] = useState<MensajeItem[]>([]);
@@ -151,7 +160,11 @@ export default function QvendesHome() {
     const sesionGuardada = localStorage.getItem('qvendes_user');
     if (sesionGuardada) {
       try {
-        setUser(JSON.parse(sesionGuardada));
+        const u = JSON.parse(sesionGuardada);
+        setUser(u);
+        setEditNombre(u.nombre || '');
+        setEditCelular(u.celular || '');
+        setEditCiudad(u.ciudad || 'Loja');
       } catch {}
     }
   }, []);
@@ -161,7 +174,7 @@ export default function QvendesHome() {
     cargarAnuncios();
   };
 
-  // LOGIN / REGISTRO COMÚN CON MANEJO MEJORADO DE ERRORES
+  // LOGIN / REGISTRO COMÚN
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
@@ -186,6 +199,9 @@ export default function QvendesHome() {
       }
 
       setUser(data.user);
+      setEditNombre(data.user.nombre || '');
+      setEditCelular(data.user.celular || '');
+      setEditCiudad(data.user.ciudad || 'Loja');
       localStorage.setItem('qvendes_user', JSON.stringify(data.user));
       setMostrarModalAuth(false);
     } catch (err) {
@@ -195,16 +211,63 @@ export default function QvendesHome() {
     }
   };
 
+  // ACTUALIZAR PERFIL DE USUARIO LOGEADO
+  const handleUpdateProfileSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+    setEditProcesando(true);
+    setEditExito(false);
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update_profile',
+          usuario_id: user.id,
+          nombre: editNombre,
+          celular: editCelular,
+          ciudad: editCiudad,
+          password: editPassword
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.user) {
+        setUser(data.user);
+        localStorage.setItem('qvendes_user', JSON.stringify(data.user));
+        setEditExito(true);
+        setEditPassword('');
+        setTimeout(() => setEditExito(false), 3000);
+      }
+    } catch (e) {
+      console.error('Error al actualizar perfil:', e);
+    } finally {
+      setEditProcesando(false);
+    }
+  };
+
   const handleLogout = () => {
     setUser(null);
     localStorage.removeItem('qvendes_user');
+    setMostrarModalPerfil(false);
   };
 
-  // PUBLICAR ANUNCIO
+  // PUBLICAR ANUNCIO CON MENSAJE DE ÉXITO Y REINICIO DE FORMULARIO
   const handlePublicarSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user) {
+      alert('Debes iniciar sesión para publicar.');
+      return;
+    }
+
+    if (!pubTitulo.trim() || !pubPrecio) {
+      alert('Por favor ingresa el título y el precio del anuncio.');
+      return;
+    }
+
     setPubProcesando(true);
+    setPubExitoMensaje(false);
+
     try {
       const res = await fetch('/api/anuncios', {
         method: 'POST',
@@ -215,7 +278,7 @@ export default function QvendesHome() {
           precio: pubPrecio,
           condicion: pubCondicion,
           categoria: pubCategoria,
-          ciudad: pubCiudad,
+          ciudad: pubCiudad || user.ciudad || 'Loja',
           descripcion: pubDescripcion,
           foto1: pubFoto1,
           foto2: pubFoto2,
@@ -227,7 +290,8 @@ export default function QvendesHome() {
       });
 
       if (res.ok) {
-        setMostrarModalPublicar(false);
+        setPubExitoMensaje(true);
+        // Limpiar todo el formulario
         setPubTitulo('');
         setPubPrecio('');
         setPubDescripcion('');
@@ -235,10 +299,22 @@ export default function QvendesHome() {
         setPubFoto2('');
         setPubFoto3('');
         setPubFoto4('');
-        cargarAnuncios();
+
+        // Recargar el feed de anuncios
+        await cargarAnuncios();
+
+        // Cerrar modal automáticamente después de 2 segundos
+        setTimeout(() => {
+          setPubExitoMensaje(false);
+          setMostrarModalPublicar(false);
+        }, 2000);
+      } else {
+        const errData = await res.json();
+        alert(`Error al publicar: ${errData.error || 'Intenta de nuevo'}`);
       }
     } catch (e) {
       console.error('Error al publicar anuncio:', e);
+      alert('Error de conexión al enviar la publicación.');
     } finally {
       setPubProcesando(false);
     }
@@ -358,7 +434,7 @@ export default function QvendesHome() {
             </button>
           </form>
 
-          {/* ACCIONES DE USUARIO CON BOTONES EN COLORES VIBRANTES ORIGINALES */}
+          {/* ACCIONES DE USUARIO Y BADGE DE NOMBRE DE USUARIO LOGEADO */}
           <div className="flex items-center gap-3">
             
             {/* BOTÓN ADMIN DE PATROCINADOS VISIBLE ÚNICAMENTE PARA soloescribeme@gmail.com */}
@@ -384,19 +460,21 @@ export default function QvendesHome() {
                   + Publicar Anuncio
                 </button>
 
-                <div className="bg-white border border-amber-300 p-2 rounded-xl flex items-center gap-2 text-xs shadow-sm">
-                  <div className="w-7 h-7 bg-purple-600 rounded-lg flex items-center justify-center font-black text-white uppercase text-xs">
+                {/* BOTÓN CON NOMBRE DE USUARIO (HACER CLIC ABRE EL MODAL DE PERFIL) */}
+                <div 
+                  onClick={() => setMostrarModalPerfil(true)}
+                  className="bg-white hover:bg-amber-50 border border-amber-300 p-2 rounded-xl flex items-center gap-2 text-xs shadow-sm cursor-pointer transition-all group"
+                  title="Haz clic para ver y editar tu perfil"
+                >
+                  <div className="w-8 h-8 bg-purple-600 group-hover:bg-purple-700 rounded-lg flex items-center justify-center font-black text-white uppercase text-xs shadow">
                     {user.nombre.charAt(0)}
                   </div>
-                  <div className="hidden sm:block text-left">
-                    <span className="font-bold text-slate-900 block leading-none">{user.nombre}</span>
+                  <div className="hidden sm:block text-left pr-1">
+                    <span className="font-black text-slate-900 group-hover:text-purple-600 transition-colors block leading-none">{user.nombre}</span>
                     <span className="text-[9px] text-emerald-600 font-bold flex items-center gap-1">
-                      {user.es_verificado ? '🛡️ Verificado' : '👤 Usuario Registrado'}
+                      {user.es_verificado ? '🛡️ Verificado' : '👤 Ver Perfil'}
                     </span>
                   </div>
-                  <button type="button" onClick={handleLogout} className="text-slate-400 hover:text-rose-600 p-1" title="Cerrar Sesión">
-                    <LogOut className="w-4 h-4" />
-                  </button>
                 </div>
               </div>
             ) : (
@@ -609,6 +687,80 @@ export default function QvendesHome() {
         </section>
 
       </div>
+
+      {/* 👤 MODAL MI PERFIL (VISUALIZAR Y ACTUALIZAR DATOS) */}
+      {mostrarModalPerfil && user && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-white border border-amber-300 rounded-3xl max-w-md w-full p-6 sm:p-8 space-y-5 shadow-2xl">
+            <div className="flex justify-between items-center border-b border-amber-200 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 bg-purple-600 rounded-xl flex items-center justify-center text-white font-black uppercase text-sm">
+                  {user.nombre.charAt(0)}
+                </div>
+                <div>
+                  <h3 className="font-black text-slate-900 uppercase text-sm leading-none">{user.nombre}</h3>
+                  <span className="text-[10px] text-slate-500 font-medium">{user.email}</span>
+                </div>
+              </div>
+
+              <button type="button" onClick={() => setMostrarModalPerfil(false)} className="text-slate-400 hover:text-slate-700 text-xs font-bold">✕ Cerrar</button>
+            </div>
+
+            {editExito && (
+              <div className="bg-emerald-50 border border-emerald-300 text-emerald-800 p-3 rounded-xl text-xs font-bold flex items-center gap-2">
+                <Check className="w-4 h-4 text-emerald-600" /> ¡Tu información de perfil se ha actualizado correctamente!
+              </div>
+            )}
+
+            <form onSubmit={handleUpdateProfileSubmit} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-[10px] font-black uppercase text-purple-700 mb-1">Nombres Completos *</label>
+                <input type="text" required value={editNombre} onChange={(e) => setEditNombre(e.target.value)} className="w-full bg-amber-50/60 border border-amber-300 rounded-xl p-3 text-slate-900 outline-none font-bold" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-purple-700 mb-1">Teléfono / Celular</label>
+                  <input type="text" value={editCelular} onChange={(e) => setEditCelular(e.target.value)} placeholder="0991234567" className="w-full bg-amber-50/60 border border-amber-300 rounded-xl p-3 text-slate-900 outline-none font-bold" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-purple-700 mb-1">Ciudad *</label>
+                  <select value={editCiudad} onChange={(e) => setEditCiudad(e.target.value)} className="w-full bg-amber-50/60 border border-amber-300 rounded-xl p-3 text-slate-900 font-bold outline-none">
+                    {ciudadesEcuador.map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black uppercase text-purple-700 mb-1">Cambiar Contraseña (opcional)</label>
+                <input type="password" value={editPassword} onChange={(e) => setEditPassword(e.target.value)} placeholder="Dejar en blanco para mantener la actual" className="w-full bg-amber-50/60 border border-amber-300 rounded-xl p-3 text-slate-900 outline-none font-bold" />
+              </div>
+
+              <div className="pt-2 flex flex-col gap-2">
+                <button
+                  type="submit"
+                  disabled={editProcesando}
+                  className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-95 text-white font-black py-3.5 rounded-xl uppercase text-xs shadow-lg transition-all flex items-center justify-center gap-1.5"
+                >
+                  <Save className="w-4 h-4" />
+                  {editProcesando ? 'Guardando...' : 'Guardar Cambios de Mi Perfil'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="w-full bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold py-2.5 rounded-xl border border-rose-200 text-xs transition-all flex items-center justify-center gap-1"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Cerrar Mi Sesión
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* 👁️ MODAL DETALLE COMPLETO DEL ANUNCIO */}
       {anuncioDetalle && (
@@ -868,7 +1020,7 @@ export default function QvendesHome() {
         </div>
       )}
 
-      {/* 🔐 MODAL AUTH (LOGIN / REGISTRO COMÚN CON BOTÓN PARA VER CONTRASEÑA Eye/EyeOff) */}
+      {/* 🔐 MODAL AUTH (LOGIN / REGISTRO COMÚN) */}
       {mostrarModalAuth && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-white border border-amber-300 rounded-3xl max-w-md w-full p-6 sm:p-8 space-y-5 shadow-2xl">
@@ -900,7 +1052,7 @@ export default function QvendesHome() {
                     </div>
                     <div>
                       <label className="block text-[10px] font-black uppercase text-purple-700 mb-1">Ciudad *</label>
-                      <select value={authCiudad} onChange={(e) => setAuthCiudad(e.target.value)} className="w-full bg-amber-50/60 border border-amber-300 rounded-xl p-3 text-slate-900 font-bold outline-none">
+                      <select value={authCiudad} onChange={(e) => setAuthCiudad(e.target.value)} className="w-full bg-amber-50/60 border border-amber-300 rounded-xl p-3 text-slate-900手 font-bold outline-none">
                         {ciudadesEcuador.map(c => (
                           <option key={c} value={c}>{c}</option>
                         ))}
@@ -915,7 +1067,6 @@ export default function QvendesHome() {
                 <input type="email" required value={authEmail} onChange={(e) => setAuthEmail(e.target.value)} placeholder="correo@ejemplo.com" className="w-full bg-amber-50/60 border border-amber-300 rounded-xl p-3 text-slate-900 outline-none font-bold" />
               </div>
 
-              {/* CONTRASEÑA CON BOTÓN PARA VER U OCULTAR */}
               <div>
                 <label className="block text-[10px] font-black uppercase text-purple-700 mb-1">Contraseña *</label>
                 <div className="relative">
@@ -962,16 +1113,22 @@ export default function QvendesHome() {
         </div>
       )}
 
-      {/* ➕ MODAL PUBLICAR ANUNCIO */}
+      {/* ➕ MODAL PUBLICAR ANUNCIO (CON NOTIFICACIÓN DE ÉXITO Y RESETEO DE CAMPOS) */}
       {mostrarModalPublicar && user && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white border border-amber-300 rounded-3xl max-w-2xl w-full p-6 sm:p-8 space-y-4 my-8 shadow-2xl">
+          <div className="bg-white border border-amber-300 rounded-3xl max-w-2xl w-full p-6 sm:p-8 space-y-4 my-8 shadow-2xl relative">
             <div className="flex justify-between items-center border-b border-amber-200 pb-3">
               <h3 className="font-black text-slate-900 uppercase text-base flex items-center gap-2">
                 <Plus className="w-5 h-5 text-purple-600" /> Publicar Nuevo Anuncio
               </h3>
               <button type="button" onClick={() => setMostrarModalPublicar(false)} className="text-slate-400 hover:text-slate-700 text-xs font-bold">✕ Cerrar</button>
             </div>
+
+            {pubExitoMensaje && (
+              <div className="bg-emerald-50 border-2 border-emerald-400 text-emerald-800 p-4 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 shadow-lg animate-in zoom-in duration-200">
+                <Check className="w-5 h-5 text-emerald-600" /> ¡Tu anuncio ha sido publicado exitosamente en Qvendes!
+              </div>
+            )}
 
             <form onSubmit={handlePublicarSubmit} className="space-y-4 text-xs">
               <div>
@@ -1039,7 +1196,7 @@ export default function QvendesHome() {
                 disabled={pubProcesando}
                 className="w-full bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:opacity-95 text-white font-black py-4 rounded-xl text-xs uppercase shadow-lg transition-all"
               >
-                {pubProcesando ? 'Publicando...' : '✅ Publicar en Qvendes'}
+                {pubProcesando ? 'Publicando Anuncio...' : '✅ Publicar en Qvendes'}
               </button>
             </form>
           </div>

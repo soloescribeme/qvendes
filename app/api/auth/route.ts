@@ -7,7 +7,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { action, email, password, nombre, celular, ciudad, usuario_id, documento_cedula, foto_cedula, foto_servicio_basico, foto_selfie_cedula, direccion_fisica } = body;
 
-    // 1. GARANTIZAR QUE TODAS LAS COLUMNAS EXISTAN EN NEON DB (MIGRACIÓN DE TABLA SI EXISTÍA PREVIAMENTE)
+    // 1. GARANTIZAR QUE TODAS LAS COLUMNAS EXISTAN EN NEON DB
     try {
       await sql`
         CREATE TABLE IF NOT EXISTS perfiles (
@@ -29,7 +29,6 @@ export async function POST(request: Request) {
         )
       `;
 
-      // Auto-migraciones para añadir columnas faltantes si la tabla perfiles fue creada en un proyecto anterior
       await sql`ALTER TABLE perfiles ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)`;
       await sql`ALTER TABLE perfiles ADD COLUMN IF NOT EXISTS nombre VARCHAR(255) DEFAULT 'Usuario'`;
       await sql`ALTER TABLE perfiles ADD COLUMN IF NOT EXISTS celular VARCHAR(50)`;
@@ -57,7 +56,6 @@ export async function POST(request: Request) {
       const hash = await bcrypt.hash(password, 10);
 
       if (existentes.length > 0) {
-        // Si la cuenta ya existía previamente en la BD, la actualizamos con el nuevo hash de contraseña y datos
         const uExistente = existentes[0];
         await sql`
           UPDATE perfiles SET 
@@ -89,17 +87,18 @@ export async function POST(request: Request) {
       `;
 
       const u = insertado[0];
-      const usuarioCreado = {
-        id: u.id,
-        email: u.email,
-        nombre: u.nombre,
-        celular: u.celular || '',
-        ciudad: u.ciudad || 'Loja',
-        es_verificado: Boolean(u.es_verificado),
-        saldo_billetera: u.saldo_billetera ? parseFloat(u.saldo_billetera) : 0
-      };
-
-      return NextResponse.json({ success: true, user: usuarioCreado });
+      return NextResponse.json({
+        success: true,
+        user: {
+          id: u.id,
+          email: u.email,
+          nombre: u.nombre,
+          celular: u.celular || '',
+          ciudad: u.ciudad || 'Loja',
+          es_verificado: Boolean(u.es_verificado),
+          saldo_billetera: u.saldo_billetera ? parseFloat(u.saldo_billetera) : 0
+        }
+      });
     }
 
     // 3. INICIO DE SESIÓN CON AUTO-SINCRO
@@ -126,7 +125,6 @@ export async function POST(request: Request) {
         } catch {}
       }
 
-      // Si la cuenta existía de intentos anteriores pero la clave no coincidía, actualizamos el hash automáticamente
       if (!esValido) {
         const hashNuevo = await bcrypt.hash(password, 10);
         await sql`UPDATE perfiles SET password_hash = ${hashNuevo} WHERE id = ${u.id}`;
@@ -145,7 +143,50 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, user: usuarioLimpio });
     }
 
-    // 4. FORMULARIO DE VERIFICACIÓN DE IDENTIDAD PRIVADA
+    // 4. ACTUALIZAR PERFIL DE USUARIO
+    if (action === 'update_profile') {
+      if (!usuario_id || !nombre) {
+        return NextResponse.json({ error: 'Nombres y usuario son obligatorios.' }, { status: 400 });
+      }
+
+      if (password && password.trim().length > 0) {
+        const newHash = await bcrypt.hash(password, 10);
+        await sql`
+          UPDATE perfiles SET
+            nombre = ${nombre},
+            celular = ${celular || ''},
+            ciudad = ${ciudad || 'Loja'},
+            password_hash = ${newHash}
+          WHERE id = ${parseInt(usuario_id)}
+        `;
+      } else {
+        await sql`
+          UPDATE perfiles SET
+            nombre = ${nombre},
+            celular = ${celular || ''},
+            ciudad = ${ciudad || 'Loja'}
+          WHERE id = ${parseInt(usuario_id)}
+        `;
+      }
+
+      const actualizados = await sql`SELECT * FROM perfiles WHERE id = ${parseInt(usuario_id)}`;
+      const u = actualizados[0];
+
+      return NextResponse.json({
+        success: true,
+        user: {
+          id: u.id,
+          email: u.email,
+          nombre: u.nombre,
+          celular: u.celular || '',
+          ciudad: u.ciudad || 'Loja',
+          es_verificado: Boolean(u.es_verificado),
+          saldo_billetera: u.saldo_billetera ? parseFloat(u.saldo_billetera) : 0
+        }
+      });
+    }
+
+    // 5. FORMULARIO DE VERIFICACIÓN DE IDENTIDAD PRIVADA
     if (action === 'verificar_identidad') {
       if (!usuario_id || !documento_cedula || !direccion_fisica) {
         return NextResponse.json({ error: 'Faltan datos obligatorios de verificación.' }, { status: 400 });
