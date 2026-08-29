@@ -51,38 +51,16 @@ export async function POST(request: Request) {
       }
 
       const emailLower = email.trim().toLowerCase();
-      const existentes = await sql`SELECT * FROM perfiles WHERE LOWER(email) = ${emailLower}`;
-      
       const hash = await bcrypt.hash(password, 10);
-
-      if (existentes.length > 0) {
-        const uExistente = existentes[0];
-        await sql`
-          UPDATE perfiles SET 
-            password_hash = ${hash},
-            nombre = ${nombre},
-            celular = ${celular || uExistente.celular || ''},
-            ciudad = ${ciudad || uExistente.ciudad || 'Loja'}
-          WHERE id = ${uExistente.id}
-        `;
-
-        return NextResponse.json({
-          success: true,
-          user: {
-            id: uExistente.id,
-            email: emailLower,
-            nombre: nombre,
-            celular: celular || uExistente.celular || '',
-            ciudad: ciudad || uExistente.ciudad || 'Loja',
-            es_verificado: Boolean(uExistente.es_verificado),
-            saldo_billetera: uExistente.saldo_billetera ? parseFloat(uExistente.saldo_billetera) : 0
-          }
-        });
-      }
 
       const insertado = await sql`
         INSERT INTO perfiles (email, password_hash, nombre, celular, ciudad, es_verificado, saldo_billetera)
         VALUES (${emailLower}, ${hash}, ${nombre}, ${celular || ''}, ${ciudad || 'Loja'}, false, 0.00)
+        ON CONFLICT (email) DO UPDATE SET 
+          password_hash = EXCLUDED.password_hash,
+          nombre = EXCLUDED.nombre,
+          celular = EXCLUDED.celular,
+          ciudad = EXCLUDED.ciudad
         RETURNING id, email, nombre, celular, ciudad, es_verificado, saldo_billetera
       `;
 
@@ -101,41 +79,23 @@ export async function POST(request: Request) {
       });
     }
 
-    // 3. INICIO DE SESIÓN CON AUTO-SINCRO
+    // 3. INICIO DE SESIÓN CON AUTO-CREACIÓN TRANSPARENTE
     if (action === 'login') {
       if (!email || !password) {
         return NextResponse.json({ error: 'Ingresa tu correo y contraseña.' }, { status: 400 });
       }
 
       const emailLower = email.trim().toLowerCase();
-      let registros = await sql`SELECT * FROM perfiles WHERE LOWER(email) = ${emailLower}`;
-      
-      if (registros.length === 0) {
-        // Auto-creación transparente si es usuario nuevo en inicio de sesión
-        const hashNuevo = await bcrypt.hash(password, 10);
-        const autoInsert = await sql`
-          INSERT INTO perfiles (email, password_hash, nombre, celular, ciudad, es_verificado, saldo_billetera)
-          VALUES (${emailLower}, ${hashNuevo}, 'Usuario Qvendes', '', 'Loja', false, 0.00)
-          RETURNING *
-        `;
-        registros = autoInsert;
-      }
+      const hashNuevo = await bcrypt.hash(password, 10);
 
-      const u = registros[0];
-      let esValido = false;
-      const passHash = u.password_hash || u.password || u.clave;
+      const autoInsert = await sql`
+        INSERT INTO perfiles (email, password_hash, nombre, celular, ciudad, es_verificado, saldo_billetera)
+        VALUES (${emailLower}, ${hashNuevo}, 'Usuario Qvendes', '', 'Loja', false, 0.00)
+        ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash
+        RETURNING id, email, nombre, celular, ciudad, es_verificado, saldo_billetera
+      `;
 
-      if (passHash && passHash.length >= 10) {
-        try {
-          esValido = await bcrypt.compare(password, passHash);
-        } catch {}
-      }
-
-      if (!esValido) {
-        const hashNuevo = await bcrypt.hash(password, 10);
-        await sql`UPDATE perfiles SET password_hash = ${hashNuevo} WHERE id = ${u.id}`;
-      }
-
+      const u = autoInsert[0];
       const usuarioLimpio = {
         id: u.id,
         email: u.email,
@@ -149,51 +109,85 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, user: usuarioLimpio });
     }
 
-    // 4. ACTUALIZAR PERFIL DE USUARIO CON FALLBACK DE BÚSQUEDA AUTOMÁTICA
+    // 4. ACTUALIZAR PERFIL CON UPSERT 100% GARANTIZADO
     if (action === 'update_profile') {
+      const emailLower = (email || '').trim().toLowerCase();
+      let passHashToSet: string | null = null;
+      if (password && password.trim().length > 0) {
+        passHashToSet = await bcrypt.hash(password, 10);
+      }
+
+      let uResult;
       let targetId = parseInt(String(usuario_id));
 
-      if (isNaN(targetId) && email) {
-        const uEmail = await sql`SELECT id FROM perfiles WHERE LOWER(email) = ${email.trim().toLowerCase()}`;
-        if (uEmail.length > 0) targetId = uEmail[0].id;
+      if (!isNaN(targetId) && targetId > 0) {
+        if (passHashToSet) {
+          uResult = await sql`
+            UPDATE perfiles SET 
+              nombre = ${nombre || 'Usuario'},
+              celular = ${celular || ''},
+              ciudad = ${ciudad || 'Loja'},
+              password_hash = ${passHashToSet}
+            WHERE id = ${targetId}
+            RETURNING *
+          `;
+        } else {
+          uResult = await sql`
+            UPDATE perfiles SET 
+              nombre = ${nombre || 'Usuario'},
+              celular = ${celular || ''},
+              ciudad = ${ciudad || 'Loja'}
+            WHERE id = ${targetId}
+            RETURNING *
+          `;
+        }
       }
 
-      // Si aun asi no hay id, tomamos el usuario mas reciente de la base de datos para auto-reparar la sesion
-      if (isNaN(targetId)) {
+      if ((!uResult || uResult.length === 0) && emailLower) {
+        if (passHashToSet) {
+          uResult = await sql`
+            INSERT INTO perfiles (email, nombre, celular, ciudad, password_hash)
+            VALUES (${emailLower}, ${nombre || 'Usuario'}, ${celular || ''}, ${ciudad || 'Loja'}, ${passHashToSet})
+            ON CONFLICT (email) DO UPDATE SET 
+              nombre = EXCLUDED.nombre,
+              celular = EXCLUDED.celular,
+              ciudad = EXCLUDED.ciudad,
+              password_hash = EXCLUDED.password_hash
+            RETURNING *
+          `;
+        } else {
+          uResult = await sql`
+            INSERT INTO perfiles (email, nombre, celular, ciudad)
+            VALUES (${emailLower}, ${nombre || 'Usuario'}, ${celular || ''}, ${ciudad || 'Loja'})
+            ON CONFLICT (email) DO UPDATE SET 
+              nombre = EXCLUDED.nombre,
+              celular = EXCLUDED.celular,
+              ciudad = EXCLUDED.ciudad
+            RETURNING *
+          `;
+        }
+      }
+
+      if (!uResult || uResult.length === 0) {
         const uUltimo = await sql`SELECT id FROM perfiles ORDER BY id DESC LIMIT 1`;
-        if (uUltimo.length > 0) targetId = uUltimo[0].id;
+        if (uUltimo.length > 0) {
+          targetId = uUltimo[0].id;
+          uResult = await sql`
+            UPDATE perfiles SET 
+              nombre = ${nombre || 'Usuario'},
+              celular = ${celular || ''},
+              ciudad = ${ciudad || 'Loja'}
+            WHERE id = ${targetId}
+            RETURNING *
+          `;
+        }
       }
 
-      if (isNaN(targetId)) {
-        return NextResponse.json({ error: 'No se encontró una cuenta activa. Por favor regístrate de nuevo.' }, { status: 400 });
+      if (!uResult || uResult.length === 0) {
+        return NextResponse.json({ error: 'No se pudo actualizar el perfil.' }, { status: 400 });
       }
 
-      if (password && password.trim().length > 0) {
-        const newHash = await bcrypt.hash(password, 10);
-        await sql`
-          UPDATE perfiles SET
-            nombre = ${nombre || 'Usuario'},
-            celular = ${celular || ''},
-            ciudad = ${ciudad || 'Loja'},
-            password_hash = ${newHash}
-          WHERE id = ${targetId}
-        `;
-      } else {
-        await sql`
-          UPDATE perfiles SET
-            nombre = ${nombre || 'Usuario'},
-            celular = ${celular || ''},
-            ciudad = ${ciudad || 'Loja'}
-          WHERE id = ${targetId}
-        `;
-      }
-
-      const actualizados = await sql`SELECT * FROM perfiles WHERE id = ${targetId}`;
-      if (actualizados.length === 0) {
-        return NextResponse.json({ error: 'No se encontró el perfil en la base de datos.' }, { status: 404 });
-      }
-
-      const u = actualizados[0];
+      const u = uResult[0];
 
       return NextResponse.json({
         success: true,

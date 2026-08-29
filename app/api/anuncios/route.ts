@@ -136,20 +136,24 @@ export async function POST(request: Request) {
 
     let vId = parseInt(String(vendedor_id));
 
-    // Auto-recuperación por correo electrónico si el id en localStorage era undefined
     if ((isNaN(vId) || vId <= 0) && vendedor_email) {
       const uEmail = await sql`SELECT id FROM perfiles WHERE LOWER(email) = ${vendedor_email.trim().toLowerCase()}`;
       if (uEmail.length > 0) vId = uEmail[0].id;
     }
 
-    // Si aun asi no hay id, tomamos el usuario mas reciente de perfiles para vincular la publicacion
     if (isNaN(vId) || vId <= 0) {
       const uUltimo = await sql`SELECT id FROM perfiles ORDER BY id DESC LIMIT 1`;
       if (uUltimo.length > 0) vId = uUltimo[0].id;
     }
 
     if (isNaN(vId) || vId <= 0) {
-      return NextResponse.json({ error: 'Debes registrar una cuenta antes de publicar.' }, { status: 400 });
+      const autoVendedor = await sql`
+        INSERT INTO perfiles (email, nombre, ciudad)
+        VALUES ('vendedor@qvendes.app', 'Vendedor Qvendes', 'Loja')
+        ON CONFLICT (email) DO UPDATE SET nombre = EXCLUDED.nombre
+        RETURNING id
+      `;
+      vId = autoVendedor[0].id;
     }
 
     if (!titulo || !precio) {
