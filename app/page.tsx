@@ -91,6 +91,10 @@ export default function QvendesHome() {
   const [authNombre, setAuthNombre] = useState('');
   const [authCelular, setAuthCelular] = useState('');
   const [authCiudad, setAuthCiudad] = useState('Loja');
+  const [authCodigoVerificacion, setAuthCodigoVerificacion] = useState('');
+  const [codigoEnviadoModal, setCodigoEnviadoModal] = useState(false);
+  const [codigoDemoAlert, setCodigoDemoAlert] = useState('');
+  const [enviandoCodigo, setEnviandoCodigo] = useState(false);
   const [authError, setAuthError] = useState('');
   const [authProcesando, setAuthProcesando] = useState(false);
 
@@ -174,10 +178,16 @@ export default function QvendesHome() {
     cargarAnuncios();
   };
 
-  // LOGIN / REGISTRO COMÚN
+  // LOGIN / REGISTRO COMÚN CON VERIFICACIÓN DE CÓDIGO
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
+
+    if (modoAuth === 'register' && !codigoEnviadoModal) {
+      setAuthError('Por favor haz clic en "Solicitar Código de Verificación" para validar tu correo.');
+      return;
+    }
+
     setAuthProcesando(true);
     try {
       const res = await fetch('/api/auth', {
@@ -189,7 +199,8 @@ export default function QvendesHome() {
           password: authPassword,
           nombre: authNombre,
           celular: authCelular,
-          ciudad: authCiudad
+          ciudad: authCiudad,
+          codigo_verificacion: authCodigoVerificacion
         })
       });
 
@@ -1064,7 +1075,7 @@ export default function QvendesHome() {
                     </div>
                     <div>
                       <label className="block text-[10px] font-black uppercase text-purple-700 mb-1">Ciudad *</label>
-                      <select value={authCiudad} onChange={(e) => setAuthCiudad(e.target.value)} className="w-full bg-amber-50/60 border border-amber-300 rounded-xl p-3 text-slate-900手 font-bold outline-none">
+                      <select value={authCiudad} onChange={(e) => setAuthCiudad(e.target.value)} className="w-full bg-amber-50/60 border border-amber-300 rounded-xl p-3 text-slate-900 font-bold outline-none">
                         {ciudadesEcuador.map(c => (
                           <option key={c} value={c}>{c}</option>
                         ))}
@@ -1101,12 +1112,75 @@ export default function QvendesHome() {
                 </div>
               </div>
 
+              {modoAuth === 'register' && (
+                <div className="space-y-3 pt-1 border-t border-amber-200">
+                  {!codigoEnviadoModal ? (
+                    <button
+                      type="button"
+                      disabled={enviandoCodigo || !authEmail.trim()}
+                      onClick={async () => {
+                        if (!authEmail.trim()) {
+                          setAuthError('Ingresa tu correo primero.');
+                          return;
+                        }
+                        setEnviandoCodigo(true);
+                        setAuthError('');
+                        try {
+                          const res = await fetch('/api/auth', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ action: 'send_code', email: authEmail })
+                          });
+                          const data = await res.json();
+                          if (res.ok) {
+                            setCodigoEnviadoModal(true);
+                            if (data.codigo_demo) {
+                              setCodigoDemoAlert(`📩 Código enviado a tu correo: ${data.codigo_demo}`);
+                            }
+                          } else {
+                            setAuthError(data.error || 'Error enviando código');
+                          }
+                        } catch {
+                          setAuthError('Error de conexión al enviar el código.');
+                        } finally {
+                          setEnviandoCodigo(false);
+                        }
+                      }}
+                      className="w-full bg-amber-200 hover:bg-amber-300 text-amber-900 font-black py-2.5 rounded-xl uppercase text-xs transition-all flex items-center justify-center gap-1.5"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      {enviandoCodigo ? 'Enviando Código...' : '📧 Solicitar Código de Verificación a mi Correo'}
+                    </button>
+                  ) : (
+                    <div className="space-y-2 bg-purple-50 p-3 rounded-2xl border border-purple-200">
+                      {codigoDemoAlert && (
+                        <div className="text-purple-800 text-[11px] font-black text-center bg-purple-100 p-2 rounded-xl border border-purple-300">
+                          {codigoDemoAlert}
+                        </div>
+                      )}
+                      <div>
+                        <label className="block text-[10px] font-black uppercase text-purple-700 mb-1">Código de 6 Dígitos Recibido *</label>
+                        <input 
+                          type="text" 
+                          required 
+                          maxLength={6} 
+                          value={authCodigoVerificacion} 
+                          onChange={(e) => setAuthCodigoVerificacion(e.target.value)} 
+                          placeholder="Ej. 123456" 
+                          className="w-full bg-white border border-purple-300 rounded-xl p-3 text-center text-slate-900 font-mono font-black text-base outline-none tracking-widest" 
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <button
                 type="submit"
                 disabled={authProcesando}
                 className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-95 disabled:opacity-50 text-white font-black py-3.5 rounded-xl uppercase text-xs tracking-wider shadow-lg transition-all"
               >
-                {authProcesando ? 'Procesando...' : modoAuth === 'login' ? 'Ingresar a mi Cuenta' : 'Crear mi Cuenta Común'}
+                {authProcesando ? 'Procesando...' : modoAuth === 'login' ? 'Ingresar a mi Cuenta' : '✅ Verificar Código y Crear mi Cuenta'}
               </button>
             </form>
 

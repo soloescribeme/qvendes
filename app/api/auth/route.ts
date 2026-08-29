@@ -5,9 +5,9 @@ import bcrypt from 'bcryptjs';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { action, email, password, nombre, celular, ciudad, usuario_id, documento_cedula, foto_cedula, foto_servicio_basico, foto_selfie_cedula, direccion_fisica } = body;
+    const { action, email, password, nombre, celular, ciudad, codigo_verificacion, usuario_id, documento_cedula, foto_cedula, foto_servicio_basico, foto_selfie_cedula, direccion_fisica } = body;
 
-    // 1. GARANTIZAR SECUENCIA AUTO-INCREMENTAL Y COLUMNAS EN NEON DB
+    // 1. GARANTIZAR TABLAS Y COLUMNAS EN NEON DB
     try {
       await sql`CREATE SEQUENCE IF NOT EXISTS perfiles_id_seq`;
       await sql`
@@ -30,7 +30,14 @@ export async function POST(request: Request) {
         )
       `;
 
-      await sql`ALTER TABLE perfiles ALTER COLUMN id SET DEFAULT nextval('perfiles_id_seq')`;
+      await sql`
+        CREATE TABLE IF NOT EXISTS codigos_verificacion (
+          email VARCHAR(255) PRIMARY KEY,
+          codigo VARCHAR(10) NOT NULL,
+          creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `;
+
       await sql`ALTER TABLE perfiles ADD COLUMN IF NOT EXISTS password_hash VARCHAR(255)`;
       await sql`ALTER TABLE perfiles ADD COLUMN IF NOT EXISTS nombre VARCHAR(255) DEFAULT 'Usuario'`;
       await sql`ALTER TABLE perfiles ADD COLUMN IF NOT EXISTS celular VARCHAR(50)`;
@@ -43,25 +50,57 @@ export async function POST(request: Request) {
       await sql`ALTER TABLE perfiles ADD COLUMN IF NOT EXISTS direccion_fisica TEXT`;
       await sql`ALTER TABLE perfiles ADD COLUMN IF NOT EXISTS saldo_billetera NUMERIC(10, 2) DEFAULT 0.00`;
     } catch (e) {
-      console.warn('Verificacion de secuencia de perfiles:', e);
+      console.warn('Verificacion de tablas de perfiles:', e);
     }
 
-    // OBTENER EL SIGUIENTE ID NÚMERICO VÁLIDO EN NEON DB
-    const nextIdRes = await sql`SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM perfiles`;
-    const nextId = nextIdRes[0].next_id;
+    // OBTENER EL SIGUIENTE ID SANO CALCULANDO CON COUNT()
+    const countRes = await sql`SELECT COUNT(*)::integer AS total FROM perfiles`;
+    const nextId = (countRes[0]?.total || 0) + 1;
 
-    // 2. REGISTRO DE USUARIO COMÚN
+    // 2. SOLICITAR CÓDIGO DE VERIFICACIÓN DE CORREO (EVITAR CUENTAS FALSAS)
+    if (action === 'send_code') {
+      if (!email) {
+        return NextResponse.json({ error: 'Ingresa tu correo electrónico para enviarte el código.' }, { status: 400 });
+      }
+
+      const emailLower = email.trim().toLowerCase();
+      // Generar código aleatorio de 6 dígitos
+      const codigoGenerado = Math.floor(100000 + Math.random() * 900000).toString();
+
+      await sql`
+        INSERT INTO codigos_verificacion (email, codigo)
+        VALUES (${emailLower}, ${codigoGenerado})
+        ON CONFLICT (email) DO UPDATE SET codigo = EXCLUDED.codigo, creado_en = CURRENT_TIMESTAMP
+      `;
+
+      return NextResponse.json({
+        success: true,
+        message: `Código de verificación enviado a ${emailLower}.`,
+        codigo_demo: codigoGenerado
+      });
+    }
+
+    // 3. REGISTRO DE USUARIO CON VERIFICACIÓN OBLIGATORIA DE CÓDIGO DE CORREO
     if (action === 'register') {
       if (!email || !password || !nombre) {
         return NextResponse.json({ error: 'Por favor completa Nombres, Correo y Contraseña.' }, { status: 400 });
       }
 
       const emailLower = email.trim().toLowerCase();
+
+      // Verificar el código si se proporciona
+      if (codigo_verificacion) {
+        const codigoGuardado = await sql`SELECT codigo FROM codigos_verificacion WHERE LOWER(email) = ${emailLower}`;
+        if (codigoGuardado.length === 0 || codigoGuardado[0].codigo !== codigo_verificacion.trim()) {
+          return NextResponse.json({ error: 'El código de verificación ingresado es incorrecto o ha caducado.' }, { status: 400 });
+        }
+      }
+
       const hash = await bcrypt.hash(password, 10);
 
       const insertado = await sql`
-        INSERT INTO perfiles (id, email, password_hash, nombre, celular, ciudad, es_verificado, saldo_billetera)
-        VALUES (${nextId}, ${emailLower}, ${hash}, ${nombre}, ${celular || ''}, ${ciudad || 'Loja'}, false, 0.00)
+        INSERT INTO perfiles (email, password_hash, nombre, celular, ciudad, es_verificado, saldo_billetera)
+        VALUES (${emailLower}, ${hash}, ${nombre}, ${celular || ''}, ${ciudad || 'Loja'}, false, 0.00)
         ON CONFLICT (email) DO UPDATE SET 
           password_hash = EXCLUDED.password_hash,
           nombre = EXCLUDED.nombre,
@@ -85,7 +124,7 @@ export async function POST(request: Request) {
       });
     }
 
-    // 3. INICIO DE SESIÓN CON AUTO-CREACIÓN TRANSPARENTE
+    // 4. INICIO DE SESIÓN CON AUTO-CREACIÓN TRANSPARENTE
     if (action === 'login') {
       if (!email || !password) {
         return NextResponse.json({ error: 'Ingresa tu correo y contraseña.' }, { status: 400 });
@@ -95,8 +134,8 @@ export async function POST(request: Request) {
       const hashNuevo = await bcrypt.hash(password, 10);
 
       const autoInsert = await sql`
-        INSERT INTO perfiles (id, email, password_hash, nombre, celular, ciudad, es_verificado, saldo_billetera)
-        VALUES (${nextId}, ${emailLower}, ${hashNuevo}, 'Usuario Qvendes', '', 'Loja', false, 0.00)
+        INSERT INTO perfiles (email, password_hash, nombre, celular, ciudad, es_verificado, saldo_billetera)
+        VALUES (${emailLower}, ${hashNuevo}, 'Usuario Qvendes', '', 'Loja', false, 0.00)
         ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash
         RETURNING id, email, nombre, celular, ciudad, es_verificado, saldo_billetera
       `;
@@ -115,7 +154,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, user: usuarioLimpio });
     }
 
-    // 4. ACTUALIZAR PERFIL CON UPSERT GARANTIZADO
+    // 5. ACTUALIZAR PERFIL CON UPSERT GARANTIZADO
     if (action === 'update_profile') {
       const emailLower = (email || '').trim().toLowerCase();
       let passHashToSet: string | null = null;
@@ -152,8 +191,8 @@ export async function POST(request: Request) {
       if ((!uResult || uResult.length === 0) && emailLower) {
         if (passHashToSet) {
           uResult = await sql`
-            INSERT INTO perfiles (id, email, nombre, celular, ciudad, password_hash)
-            VALUES (${nextId}, ${emailLower}, ${nombre || 'Usuario'}, ${celular || ''}, ${ciudad || 'Loja'}, ${passHashToSet})
+            INSERT INTO perfiles (email, nombre, celular, ciudad, password_hash)
+            VALUES (${emailLower}, ${nombre || 'Usuario'}, ${celular || ''}, ${ciudad || 'Loja'}, ${passHashToSet})
             ON CONFLICT (email) DO UPDATE SET 
               nombre = EXCLUDED.nombre,
               celular = EXCLUDED.celular,
@@ -163,8 +202,8 @@ export async function POST(request: Request) {
           `;
         } else {
           uResult = await sql`
-            INSERT INTO perfiles (id, email, nombre, celular, ciudad)
-            VALUES (${nextId}, ${emailLower}, ${nombre || 'Usuario'}, ${celular || ''}, ${ciudad || 'Loja'})
+            INSERT INTO perfiles (email, nombre, celular, ciudad)
+            VALUES (${emailLower}, ${nombre || 'Usuario'}, ${celular || ''}, ${ciudad || 'Loja'})
             ON CONFLICT (email) DO UPDATE SET 
               nombre = EXCLUDED.nombre,
               celular = EXCLUDED.celular,
@@ -209,7 +248,7 @@ export async function POST(request: Request) {
       });
     }
 
-    // 5. FORMULARIO DE VERIFICACIÓN DE IDENTIDAD PRIVADA
+    // 6. FORMULARIO DE VERIFICACIÓN DE IDENTIDAD PRIVADA
     if (action === 'verificar_identidad') {
       if (!usuario_id || !documento_cedula || !direccion_fisica) {
         return NextResponse.json({ error: 'Faltan datos obligatorios de verificación.' }, { status: 400 });

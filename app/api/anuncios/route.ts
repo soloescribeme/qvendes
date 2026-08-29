@@ -40,7 +40,6 @@ export async function GET(request: Request) {
           creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
       `;
-      await sql`ALTER TABLE anuncios ALTER COLUMN id SET DEFAULT nextval('anuncios_id_seq')`;
     } catch {
       // Ignorar si existe
     }
@@ -191,18 +190,14 @@ export async function POST(request: Request) {
           creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
       `;
-      await sql`ALTER TABLE anuncios ALTER COLUMN id SET DEFAULT nextval('anuncios_id_seq')`;
     } catch {}
-
-    const nextAdRes = await sql`SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM anuncios`;
-    const nextAdId = nextAdRes[0].next_id;
 
     const insertado = await sql`
       INSERT INTO anuncios (
-        id, vendedor_id, titulo, precio, condicion, categoria, ciudad, descripcion,
+        vendedor_id, titulo, precio, condicion, categoria, ciudad, descripcion,
         foto1, foto2, foto3, foto4, metodos_pago, metodos_envio
       ) VALUES (
-        ${nextAdId}, ${vId}, ${titulo}, ${parseFloat(precio)}, ${condicion || 'nuevo'},
+        ${vId}, ${titulo}, ${parseFloat(precio)}, ${condicion || 'nuevo'},
         ${categoria || 'general'}, ${ciudad || 'Loja'}, ${descripcion || ''},
         ${foto1 || null}, ${foto2 || null}, ${foto3 || null}, ${foto4 || null},
         ${metodos_pago || 'Efectivo / Transferencia'}, ${metodos_envio || 'Acuerdo personal'}
