@@ -1182,27 +1182,66 @@ export default function QvendesHome() {
                 <textarea rows={3} required value={pubDescripcion} onChange={(e) => setPubDescripcion(e.target.value)} placeholder="Describe las características técnicas, motivo de venta o detalles de contacto..." className="w-full bg-amber-50/60 border border-amber-300 rounded-xl p-3 text-slate-900 outline-none font-medium" />
               </div>
 
-              {/* FOTOS BASE64 */}
+              {/* FOTOS COMPRIMIDAS EN CANVAS */}
               <div className="space-y-2">
                 <label className="block text-[10px] font-black uppercase text-purple-700">Fotos del Producto (Hasta 4 fotos)</label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {[setPubFoto1, setPubFoto2, setPubFoto3, setPubFoto4].map((setter, idx) => (
-                    <input 
-                      key={idx}
-                      type="file" 
-                      accept="image/*"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onloadend = () => {
-                            if (typeof reader.result === 'string') setter(reader.result);
-                          };
-                          reader.readAsDataURL(file);
-                        }
-                      }}
-                      className="text-[9px] text-slate-600 file:mr-2 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-[9px] file:font-black file:bg-purple-600 file:text-white" 
-                    />
+                  {[
+                    { val: pubFoto1, setter: setPubFoto1, label: 'Foto 1 Principal' },
+                    { val: pubFoto2, setter: setPubFoto2, label: 'Foto 2' },
+                    { val: pubFoto3, setter: setPubFoto3, label: 'Foto 3' },
+                    { val: pubFoto4, setter: setPubFoto4, label: 'Foto 4' }
+                  ].map((item, idx) => (
+                    <div key={idx} className="space-y-1">
+                      <div className="h-20 bg-amber-50 rounded-xl border border-amber-300 flex items-center justify-center overflow-hidden relative">
+                        {item.val ? (
+                          <img src={item.val} alt={`Foto ${idx+1}`} className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-[10px] font-bold text-amber-800">📷 {item.label}</span>
+                        )}
+                      </div>
+                      <input 
+                        type="file" 
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (ev) => {
+                              const img = new Image();
+                              img.onload = () => {
+                                const canvas = document.createElement('canvas');
+                                const MAX_WIDTH = 800;
+                                const MAX_HEIGHT = 800;
+                                let width = img.width;
+                                let height = img.height;
+
+                                if (width > height) {
+                                  if (width > MAX_WIDTH) {
+                                    height *= MAX_WIDTH / width;
+                                    width = MAX_WIDTH;
+                                  }
+                                } else {
+                                  if (height > MAX_HEIGHT) {
+                                    width *= MAX_HEIGHT / height;
+                                    height = MAX_HEIGHT;
+                                  }
+                                }
+
+                                canvas.width = width;
+                                canvas.height = height;
+                                const ctx = canvas.getContext('2d');
+                                ctx?.drawImage(img, 0, 0, width, height);
+                                item.setter(canvas.toDataURL('image/jpeg', 0.7));
+                              };
+                              img.src = ev.target?.result as string;
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                        className="text-[9px] text-slate-600 file:mr-1 file:py-1 file:px-2 file:rounded-lg file:border-0 file:text-[9px] file:font-black file:bg-purple-600 file:text-white w-full" 
+                      />
+                    </div>
                   ))}
                 </div>
               </div>
