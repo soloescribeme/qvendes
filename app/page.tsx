@@ -319,20 +319,22 @@ export default function QvendesHome() {
         setPubFoto3('');
         setPubFoto4('');
 
-        await cargarAnuncios();
+        // Recargar anuncios de forma asíncrona no bloqueante
+        cargarAnuncios().catch(() => {});
 
         setTimeout(() => {
           setPubExitoMensaje(false);
           setMostrarModalPublicar(false);
-        }, 2000);
+          setPubProcesando(false);
+        }, 1200);
       } else {
+        setPubProcesando(false);
         alert(`Error al publicar: ${data.error || 'Intenta de nuevo'}`);
       }
     } catch (e) {
       console.error('Error al publicar anuncio:', e);
-      alert('Error de conexión al enviar la publicación.');
-    } finally {
       setPubProcesando(false);
+      alert('Error de conexión al enviar la publicación.');
     }
   };
 
