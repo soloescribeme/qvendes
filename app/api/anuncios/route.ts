@@ -13,9 +13,10 @@ export async function GET(request: Request) {
 
     // 1. INICIALIZAR Y VERIFICAR TABLA DE ANUNCIOS
     try {
+      await sql`CREATE SEQUENCE IF NOT EXISTS anuncios_id_seq`;
       await sql`
         CREATE TABLE IF NOT EXISTS anuncios (
-          id SERIAL PRIMARY KEY,
+          id INT PRIMARY KEY DEFAULT nextval('anuncios_id_seq'),
           vendedor_id INT NOT NULL,
           titulo VARCHAR(255) NOT NULL,
           precio NUMERIC(10, 2) NOT NULL,
@@ -39,6 +40,7 @@ export async function GET(request: Request) {
           creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
       `;
+      await sql`ALTER TABLE anuncios ALTER COLUMN id SET DEFAULT nextval('anuncios_id_seq')`;
     } catch {
       // Ignorar si existe
     }
@@ -160,11 +162,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'El título y el precio son obligatorios.' }, { status: 400 });
     }
 
-    // 1. INICIALIZAR TABLA DE ANUNCIOS EN NEON DB IF NOT EXISTS
+    // 1. INICIALIZAR TABLA DE ANUNCIOS EN NEON DB
     try {
+      await sql`CREATE SEQUENCE IF NOT EXISTS anuncios_id_seq`;
       await sql`
         CREATE TABLE IF NOT EXISTS anuncios (
-          id SERIAL PRIMARY KEY,
+          id INT PRIMARY KEY DEFAULT nextval('anuncios_id_seq'),
           vendedor_id INT NOT NULL,
           titulo VARCHAR(255) NOT NULL,
           precio NUMERIC(10, 2) NOT NULL,
@@ -188,14 +191,18 @@ export async function POST(request: Request) {
           creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
       `;
+      await sql`ALTER TABLE anuncios ALTER COLUMN id SET DEFAULT nextval('anuncios_id_seq')`;
     } catch {}
+
+    const nextAdRes = await sql`SELECT COALESCE(MAX(id), 0) + 1 AS next_id FROM anuncios`;
+    const nextAdId = nextAdRes[0].next_id;
 
     const insertado = await sql`
       INSERT INTO anuncios (
-        vendedor_id, titulo, precio, condicion, categoria, ciudad, descripcion,
+        id, vendedor_id, titulo, precio, condicion, categoria, ciudad, descripcion,
         foto1, foto2, foto3, foto4, metodos_pago, metodos_envio
       ) VALUES (
-        ${vId}, ${titulo}, ${parseFloat(precio)}, ${condicion || 'nuevo'},
+        ${nextAdId}, ${vId}, ${titulo}, ${parseFloat(precio)}, ${condicion || 'nuevo'},
         ${categoria || 'general'}, ${ciudad || 'Loja'}, ${descripcion || ''},
         ${foto1 || null}, ${foto2 || null}, ${foto3 || null}, ${foto4 || null},
         ${metodos_pago || 'Efectivo / Transferencia'}, ${metodos_envio || 'Acuerdo personal'}
