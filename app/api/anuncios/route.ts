@@ -11,7 +11,7 @@ export async function GET(request: Request) {
     const precioMax = searchParams.get('precio_max');
     const vendedorId = searchParams.get('vendedor_id');
 
-    // 1. INICIALIZAR TABLA DE ANUNCIOS EN NEON DB IF NOT EXISTS
+    // 1. INICIALIZAR Y VERIFICAR TABLA DE ANUNCIOS
     try {
       await sql`
         CREATE TABLE IF NOT EXISTS anuncios (
@@ -112,7 +112,6 @@ export async function GET(request: Request) {
     const topAds = filtrados.filter(a => a.es_top || a.es_patrocinado);
     const regulares = filtrados.filter(a => !a.es_top && !a.es_patrocinado);
 
-    // Algoritmo de desorden aleatorio (Fisher-Yates Shuffle) para dar oportunidad a todos
     const regularesRandom = [...regulares];
     for (let i = regularesRandom.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
@@ -135,16 +134,51 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { vendedor_id, titulo, precio, condicion, categoria, ciudad, descripcion, foto1, foto2, foto3, foto4, metodos_pago, metodos_envio } = body;
 
-    if (!vendedor_id || !titulo || !precio) {
-      return NextResponse.json({ error: 'Faltan datos obligatorios para publicar el anuncio.' }, { status: 400 });
+    const vId = parseInt(String(vendedor_id));
+    if (isNaN(vId) || vId <= 0) {
+      return NextResponse.json({ error: 'Tu sesión ha expirado. Por favor cierra sesión y vuelve a ingresar para publicar.' }, { status: 400 });
     }
+
+    if (!titulo || !precio) {
+      return NextResponse.json({ error: 'El título y el precio son obligatorios.' }, { status: 400 });
+    }
+
+    // 1. INICIALIZAR TABLA DE ANUNCIOS EN NEON DB IF NOT EXISTS
+    try {
+      await sql`
+        CREATE TABLE IF NOT EXISTS anuncios (
+          id SERIAL PRIMARY KEY,
+          vendedor_id INT NOT NULL,
+          titulo VARCHAR(255) NOT NULL,
+          precio NUMERIC(10, 2) NOT NULL,
+          condicion VARCHAR(50) DEFAULT 'nuevo',
+          categoria VARCHAR(100) DEFAULT 'general',
+          ciudad VARCHAR(100) DEFAULT 'Loja',
+          descripcion TEXT,
+          foto1 TEXT,
+          foto2 TEXT,
+          foto3 TEXT,
+          foto4 TEXT,
+          metodos_pago TEXT,
+          metodos_envio TEXT,
+          es_top BOOLEAN DEFAULT false,
+          es_patrocinado BOOLEAN DEFAULT false,
+          palabras_clave TEXT,
+          franja_horaria_inicio VARCHAR(10),
+          franja_horaria_fin VARCHAR(10),
+          fecha_vencimiento TIMESTAMP,
+          estado VARCHAR(50) DEFAULT 'activo',
+          creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `;
+    } catch {}
 
     const insertado = await sql`
       INSERT INTO anuncios (
         vendedor_id, titulo, precio, condicion, categoria, ciudad, descripcion,
         foto1, foto2, foto3, foto4, metodos_pago, metodos_envio
       ) VALUES (
-        ${parseInt(vendedor_id)}, ${titulo}, ${parseFloat(precio)}, ${condicion || 'nuevo'},
+        ${vId}, ${titulo}, ${parseFloat(precio)}, ${condicion || 'nuevo'},
         ${categoria || 'general'}, ${ciudad || 'Loja'}, ${descripcion || ''},
         ${foto1 || null}, ${foto2 || null}, ${foto3 || null}, ${foto4 || null},
         ${metodos_pago || 'Efectivo / Transferencia'}, ${metodos_envio || 'Acuerdo personal'}
@@ -155,6 +189,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, id: insertado[0].id });
   } catch (error) {
     console.error('Error al publicar anuncio en Qvendes:', error);
-    return NextResponse.json({ error: 'Error al registrar la publicación en el servidor.' }, { status: 500 });
+    const mensajeDetallado = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ error: `Error del servidor: ${mensajeDetallado}` }, { status: 500 });
   }
 }

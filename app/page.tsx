@@ -214,7 +214,13 @@ export default function QvendesHome() {
   // ACTUALIZAR PERFIL DE USUARIO LOGEADO
   const handleUpdateProfileSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || !user.id) {
+      alert('Tu sesión ha expirado. Por favor inicia sesión nuevamente.');
+      setMostrarModalPerfil(false);
+      setModoAuth('login');
+      setMostrarModalAuth(true);
+      return;
+    }
     setEditProcesando(true);
     setEditExito(false);
     try {
@@ -238,9 +244,12 @@ export default function QvendesHome() {
         setEditExito(true);
         setEditPassword('');
         setTimeout(() => setEditExito(false), 3000);
+      } else {
+        alert(`Error al guardar perfil: ${data.error || 'Intenta de nuevo'}`);
       }
     } catch (e) {
       console.error('Error al actualizar perfil:', e);
+      alert('Error de conexión al actualizar perfil.');
     } finally {
       setEditProcesando(false);
     }
@@ -255,8 +264,11 @@ export default function QvendesHome() {
   // PUBLICAR ANUNCIO CON MENSAJE DE ÉXITO Y REINICIO DE FORMULARIO
   const handlePublicarSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) {
-      alert('Debes iniciar sesión para publicar.');
+    if (!user || !user.id) {
+      alert('Debes iniciar sesión primero para publicar un anuncio.');
+      setMostrarModalPublicar(false);
+      setModoAuth('login');
+      setMostrarModalAuth(true);
       return;
     }
 
@@ -289,9 +301,10 @@ export default function QvendesHome() {
         })
       });
 
-      if (res.ok) {
+      const data = await res.json();
+
+      if (res.ok && data.success) {
         setPubExitoMensaje(true);
-        // Limpiar todo el formulario
         setPubTitulo('');
         setPubPrecio('');
         setPubDescripcion('');
@@ -300,17 +313,14 @@ export default function QvendesHome() {
         setPubFoto3('');
         setPubFoto4('');
 
-        // Recargar el feed de anuncios
         await cargarAnuncios();
 
-        // Cerrar modal automáticamente después de 2 segundos
         setTimeout(() => {
           setPubExitoMensaje(false);
           setMostrarModalPublicar(false);
         }, 2000);
       } else {
-        const errData = await res.json();
-        alert(`Error al publicar: ${errData.error || 'Intenta de nuevo'}`);
+        alert(`Error al publicar: ${data.error || 'Intenta de nuevo'}`);
       }
     } catch (e) {
       console.error('Error al publicar anuncio:', e);
