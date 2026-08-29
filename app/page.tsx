@@ -1135,31 +1135,33 @@ export default function QvendesHome() {
                           if (res.ok) {
                             setCodigoEnviadoModal(true);
                             if (data.codigo_demo) {
-                              setCodigoDemoAlert(`📩 Código enviado a tu correo: ${data.codigo_demo}`);
+                              setAuthCodigoVerificacion(data.codigo_demo);
+                              setCodigoDemoAlert(`📩 Código de seguridad de 6 dígitos: ${data.codigo_demo}`);
                             }
                           } else {
                             setAuthError(data.error || 'Error enviando código');
                           }
                         } catch {
-                          setAuthError('Error de conexión al enviar el código.');
+                          setAuthError('Error de conexión al generar el código.');
                         } finally {
                           setEnviandoCodigo(false);
                         }
                       }}
-                      className="w-full bg-amber-200 hover:bg-amber-300 text-amber-900 font-black py-2.5 rounded-xl uppercase text-xs transition-all flex items-center justify-center gap-1.5"
+                      className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 hover:opacity-95 text-slate-950 font-black py-3 rounded-xl uppercase text-xs shadow-md transition-all flex items-center justify-center gap-2"
                     >
-                      <Send className="w-3.5 h-3.5" />
-                      {enviandoCodigo ? 'Enviando Código...' : '📧 Solicitar Código de Verificación a mi Correo'}
+                      <Send className="w-4 h-4 text-purple-900" />
+                      {enviandoCodigo ? 'Generando Código...' : '📧 Solicitar Código de Verificación de Correo'}
                     </button>
                   ) : (
-                    <div className="space-y-2 bg-purple-50 p-3 rounded-2xl border border-purple-200">
+                    <div className="space-y-3 bg-purple-50 p-4 rounded-2xl border-2 border-purple-300">
                       {codigoDemoAlert && (
-                        <div className="text-purple-800 text-[11px] font-black text-center bg-purple-100 p-2 rounded-xl border border-purple-300">
-                          {codigoDemoAlert}
+                        <div className="text-purple-950 text-xs font-black text-center bg-purple-100 p-3 rounded-xl border border-purple-300 shadow-sm space-y-1">
+                          <div>{codigoDemoAlert}</div>
+                          <span className="text-[10px] text-purple-700 font-bold block">(Código autocompletado en la casilla de abajo)</span>
                         </div>
                       )}
                       <div>
-                        <label className="block text-[10px] font-black uppercase text-purple-700 mb-1">Código de 6 Dígitos Recibido *</label>
+                        <label className="block text-[10px] font-black uppercase text-purple-800 mb-1">Código de 6 Dígitos de Verificación *</label>
                         <input 
                           type="text" 
                           required 
@@ -1167,7 +1169,7 @@ export default function QvendesHome() {
                           value={authCodigoVerificacion} 
                           onChange={(e) => setAuthCodigoVerificacion(e.target.value)} 
                           placeholder="Ej. 123456" 
-                          className="w-full bg-white border border-purple-300 rounded-xl p-3 text-center text-slate-900 font-mono font-black text-base outline-none tracking-widest" 
+                          className="w-full bg-white border-2 border-purple-400 rounded-xl p-3 text-center text-slate-900 font-mono font-black text-lg outline-none tracking-widest shadow-inner" 
                         />
                       </div>
                     </div>
