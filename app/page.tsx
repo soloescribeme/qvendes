@@ -178,16 +178,10 @@ export default function QvendesHome() {
     cargarAnuncios();
   };
 
-  // LOGIN / REGISTRO COMÚN CON VERIFICACIÓN DE CÓDIGO
+  // LOGIN / REGISTRO DIRECTO DE USUARIO
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError('');
-
-    if (modoAuth === 'register' && !codigoEnviadoModal) {
-      setAuthError('Por favor haz clic en "Solicitar Código de Verificación" para validar tu correo.');
-      return;
-    }
-
     setAuthProcesando(true);
     try {
       const res = await fetch('/api/auth', {
@@ -199,8 +193,7 @@ export default function QvendesHome() {
           password: authPassword,
           nombre: authNombre,
           celular: authCelular,
-          ciudad: authCiudad,
-          codigo_verificacion: authCodigoVerificacion
+          ciudad: authCiudad
         })
       });
 
@@ -1112,77 +1105,12 @@ export default function QvendesHome() {
                 </div>
               </div>
 
-              {modoAuth === 'register' && (
-                <div className="space-y-3 pt-1 border-t border-amber-200">
-                  {!codigoEnviadoModal ? (
-                    <button
-                      type="button"
-                      disabled={enviandoCodigo || !authEmail.trim()}
-                      onClick={async () => {
-                        if (!authEmail.trim() || !authEmail.includes('@')) {
-                          setAuthError('Por favor ingresa un correo electrónico válido.');
-                          return;
-                        }
-                        setEnviandoCodigo(true);
-                        setAuthError('');
-                        try {
-                          const res = await fetch('/api/auth', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ action: 'send_code', email: authEmail })
-                          });
-                          const data = await res.json();
-                          if (res.ok) {
-                            setCodigoEnviadoModal(true);
-                            if (data.codigo_demo) {
-                              setAuthCodigoVerificacion(data.codigo_demo);
-                              setCodigoDemoAlert(`📩 Código de verificación de 6 dígitos: ${data.codigo_demo}`);
-                            }
-                          } else {
-                            setAuthError(data.error || 'Error enviando código');
-                          }
-                        } catch {
-                          setAuthError('Error de conexión al solicitar el código.');
-                        } finally {
-                          setEnviandoCodigo(false);
-                        }
-                      }}
-                      className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 hover:opacity-95 text-slate-950 font-black py-3 rounded-xl uppercase text-xs shadow-md transition-all flex items-center justify-center gap-2"
-                    >
-                      <Send className="w-4 h-4 text-purple-900" />
-                      {enviandoCodigo ? 'Generando Código...' : '📧 Solicitar Código de Verificación de Correo'}
-                    </button>
-                  ) : (
-                    <div className="space-y-3 bg-purple-50 p-4 rounded-2xl border-2 border-purple-300">
-                      {codigoDemoAlert && (
-                        <div className="text-purple-950 text-xs font-black text-center bg-purple-100 p-3 rounded-xl border border-purple-300 shadow-sm space-y-1">
-                          <div>{codigoDemoAlert}</div>
-                          <span className="text-[10px] text-purple-700 font-bold block">(Código de seguridad autocompletado)</span>
-                        </div>
-                      )}
-                      <div>
-                        <label className="block text-[10px] font-black uppercase text-purple-800 mb-1">Código de 6 Dígitos Recibido *</label>
-                        <input 
-                          type="text" 
-                          required 
-                          maxLength={6} 
-                          value={authCodigoVerificacion} 
-                          onChange={(e) => setAuthCodigoVerificacion(e.target.value)} 
-                          placeholder="Ej. 123456" 
-                          className="w-full bg-white border-2 border-purple-400 rounded-xl p-3 text-center text-slate-900 font-mono font-black text-xl outline-none tracking-widest shadow-inner focus:border-purple-600" 
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
               <button
                 type="submit"
                 disabled={authProcesando}
-                className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-95 disabled:opacity-50 text-white font-black py-3.5 rounded-xl uppercase text-xs tracking-wider shadow-lg transition-all"
+                className="w-full bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:opacity-95 disabled:opacity-50 text-white font-black py-4 rounded-xl uppercase text-xs tracking-wider shadow-lg transition-all"
               >
-                {authProcesando ? 'Procesando...' : modoAuth === 'login' ? 'Ingresar a mi Cuenta' : '✅ Verificar Código y Crear mi Cuenta'}
+                {authProcesando ? 'Procesando...' : modoAuth === 'login' ? '🔑 Ingresar a mi Cuenta' : '📝 Crear mi Cuenta Común'}
               </button>
             </form>
 
