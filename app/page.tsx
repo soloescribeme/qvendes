@@ -1119,8 +1119,8 @@ export default function QvendesHome() {
                       type="button"
                       disabled={enviandoCodigo || !authEmail.trim()}
                       onClick={async () => {
-                        if (!authEmail.trim()) {
-                          setAuthError('Ingresa tu correo primero.');
+                        if (!authEmail.trim() || !authEmail.includes('@')) {
+                          setAuthError('Por favor ingresa un correo electrónico válido.');
                           return;
                         }
                         setEnviandoCodigo(true);
@@ -1134,15 +1134,13 @@ export default function QvendesHome() {
                           const data = await res.json();
                           if (res.ok) {
                             setCodigoEnviadoModal(true);
-                            if (data.codigo_demo) {
-                              setAuthCodigoVerificacion(data.codigo_demo);
-                              setCodigoDemoAlert(`📩 Código de seguridad de 6 dígitos: ${data.codigo_demo}`);
-                            }
+                            setAuthCodigoVerificacion('');
+                            setCodigoDemoAlert(`📩 ${data.message || `Código de 6 dígitos enviado a ${authEmail}. Revisa tu bandeja de entrada o Spam.`}`);
                           } else {
-                            setAuthError(data.error || 'Error enviando código');
+                            setAuthError(data.error || 'Error enviando código al correo');
                           }
                         } catch {
-                          setAuthError('Error de conexión al generar el código.');
+                          setAuthError('Error de conexión al solicitar el código de correo.');
                         } finally {
                           setEnviandoCodigo(false);
                         }
@@ -1150,26 +1148,25 @@ export default function QvendesHome() {
                       className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 hover:opacity-95 text-slate-950 font-black py-3 rounded-xl uppercase text-xs shadow-md transition-all flex items-center justify-center gap-2"
                     >
                       <Send className="w-4 h-4 text-purple-900" />
-                      {enviandoCodigo ? 'Generando Código...' : '📧 Solicitar Código de Verificación de Correo'}
+                      {enviandoCodigo ? 'Enviando Código...' : '📧 Enviar Código de Verificación al Correo'}
                     </button>
                   ) : (
                     <div className="space-y-3 bg-purple-50 p-4 rounded-2xl border-2 border-purple-300">
                       {codigoDemoAlert && (
-                        <div className="text-purple-950 text-xs font-black text-center bg-purple-100 p-3 rounded-xl border border-purple-300 shadow-sm space-y-1">
-                          <div>{codigoDemoAlert}</div>
-                          <span className="text-[10px] text-purple-700 font-bold block">(Código autocompletado en la casilla de abajo)</span>
+                        <div className="text-purple-950 text-xs font-bold text-center bg-purple-100 p-3 rounded-xl border border-purple-300 shadow-sm leading-relaxed">
+                          {codigoDemoAlert}
                         </div>
                       )}
                       <div>
-                        <label className="block text-[10px] font-black uppercase text-purple-800 mb-1">Código de 6 Dígitos de Verificación *</label>
+                        <label className="block text-[10px] font-black uppercase text-purple-800 mb-1">Ingresa el Código de 6 Dígitos Recibido *</label>
                         <input 
                           type="text" 
                           required 
                           maxLength={6} 
                           value={authCodigoVerificacion} 
                           onChange={(e) => setAuthCodigoVerificacion(e.target.value)} 
-                          placeholder="Ej. 123456" 
-                          className="w-full bg-white border-2 border-purple-400 rounded-xl p-3 text-center text-slate-900 font-mono font-black text-lg outline-none tracking-widest shadow-inner" 
+                          placeholder="Ej. 654321" 
+                          className="w-full bg-white border-2 border-purple-400 rounded-xl p-3 text-center text-slate-900 font-mono font-black text-xl outline-none tracking-widest shadow-inner focus:border-purple-600" 
                         />
                       </div>
                     </div>
