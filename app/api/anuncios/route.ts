@@ -7,7 +7,7 @@ async function asegurarTablasAnuncios() {
     await sql`
       CREATE TABLE IF NOT EXISTS anuncios (
         id INT PRIMARY KEY DEFAULT nextval('anuncios_id_seq'),
-        vendedor_id INT NOT NULL,
+        vendedor_id VARCHAR(255) NOT NULL,
         titulo VARCHAR(255) NOT NULL,
         precio NUMERIC(10, 2) NOT NULL,
         condicion VARCHAR(50) DEFAULT 'nuevo',
@@ -30,6 +30,9 @@ async function asegurarTablasAnuncios() {
         creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `;
+
+    // Alterar columna vendedor_id a VARCHAR(255) para compatibilidad total con todo tipo de ID
+    await sql`ALTER TABLE anuncios ALTER COLUMN vendedor_id TYPE VARCHAR(255) USING vendedor_id::text`;
 
     // Garantizar que existan todas las columnas si la tabla se creo con esquema previo
     await sql`ALTER TABLE anuncios ADD COLUMN IF NOT EXISTS condicion VARCHAR(50) DEFAULT 'nuevo'`;
@@ -171,26 +174,37 @@ export async function POST(request: Request) {
 
     await asegurarTablasAnuncios();
 
-    let vId = parseInt(String(vendedor_id));
+    let vId = vendedor_id ? String(vendedor_id) : '';
 
-    if ((isNaN(vId) || vId <= 0) && vendedor_email) {
+    if (!vId && vendedor_email) {
       const uEmail = await sql`SELECT id FROM perfiles WHERE LOWER(email) = ${vendedor_email.trim().toLowerCase()}`;
-      if (uEmail.length > 0) vId = uEmail[0].id;
+      if (uEmail.length > 0) vId = String(uEmail[0].id);
     }
 
-    if (isNaN(vId) || vId <= 0) {
+    if (!vId) {
       const uUltimo = await sql`SELECT id FROM perfiles ORDER BY id DESC LIMIT 1`;
-      if (uUltimo.length > 0) vId = uUltimo[0].id;
+      if (uUltimo.length > 0) vId = String(uUltimo[0].id);
     }
 
-    if (isNaN(vId) || vId <= 0) {
-      const autoVendedor = await sql`
-        INSERT INTO perfiles (email, nombre, ciudad)
-        VALUES ('vendedor@qvendes.app', 'Vendedor Qvendes', 'Loja')
-        ON CONFLICT (email) DO UPDATE SET nombre = EXCLUDED.nombre
-        RETURNING id
-      `;
-      vId = autoVendedor[0].id;
+    if (!vId) {
+      const fallbackId = 'usr_vendedor_default';
+      let autoVendedor;
+      try {
+        autoVendedor = await sql`
+          INSERT INTO perfiles (id, email, nombre, ciudad)
+          VALUES (${fallbackId}, 'vendedor@qvendes.app', 'Vendedor Qvendes', 'Loja')
+          ON CONFLICT (email) DO UPDATE SET nombre = EXCLUDED.nombre
+          RETURNING id
+        `;
+      } catch {
+        autoVendedor = await sql`
+          INSERT INTO perfiles (email, nombre, ciudad)
+          VALUES ('vendedor@qvendes.app', 'Vendedor Qvendes', 'Loja')
+          ON CONFLICT (email) DO UPDATE SET nombre = EXCLUDED.nombre
+          RETURNING id
+        `;
+      }
+      vId = String(autoVendedor[0].id);
     }
 
     if (!titulo || !precio) {
@@ -218,4 +232,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: `Error del servidor: ${mensajeDetallado}` }, { status: 500 });
   }
 }
+
 
