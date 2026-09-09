@@ -47,14 +47,14 @@ export async function POST(request: Request) {
 
     // VERIFICACIÓN ESTRICTA DE SESIÓN CONTRA LA BASE DE DATOS REAL
     if (action === 'verify') {
-      const targetId = parseInt(String(usuario_id));
       const emailLower = (email || '').trim().toLowerCase();
+      const uStrId = usuario_id ? String(usuario_id) : '';
 
       let uResult = null;
-      if (!isNaN(targetId) && targetId > 0) {
+      if (uStrId) {
         uResult = await sql`
           SELECT id, email, nombre, celular, ciudad, es_verificado, saldo_billetera 
-          FROM perfiles WHERE id = ${targetId}
+          FROM perfiles WHERE id::text = ${uStrId}
         `;
       }
 
@@ -73,7 +73,7 @@ export async function POST(request: Request) {
       return NextResponse.json({
         success: true,
         user: {
-          id: u.id,
+          id: String(u.id),
           email: u.email,
           nombre: u.nombre || 'Usuario',
           celular: u.celular || '',
@@ -84,7 +84,7 @@ export async function POST(request: Request) {
       });
     }
 
-    // 2. REGISTRO DIRECTO DE USUARIO (SIN CÓDIGO TEMPORALMENTE HASTA VERIFICAR DNS)
+    // 2. REGISTRO DIRECTO DE USUARIO EN NEON DB
     if (action === 'register') {
       if (!email || !password || !nombre) {
         return NextResponse.json({ error: 'Por favor completa Nombres, Correo y Contraseña.' }, { status: 400 });
@@ -93,22 +93,37 @@ export async function POST(request: Request) {
       const emailLower = email.trim().toLowerCase();
       const hash = await bcrypt.hash(password, 10);
 
-      const insertado = await sql`
-        INSERT INTO perfiles (email, password_hash, nombre, celular, ciudad, es_verificado, saldo_billetera)
-        VALUES (${emailLower}, ${hash}, ${nombre}, ${celular || ''}, ${ciudad || 'Loja'}, false, 0.00)
-        ON CONFLICT (email) DO UPDATE SET 
-          password_hash = EXCLUDED.password_hash,
-          nombre = EXCLUDED.nombre,
-          celular = EXCLUDED.celular,
-          ciudad = EXCLUDED.ciudad
-        RETURNING id, email, nombre, celular, ciudad, es_verificado, saldo_billetera
-      `;
+      let insertado;
+      try {
+        insertado = await sql`
+          INSERT INTO perfiles (email, password_hash, nombre, celular, ciudad, es_verificado, saldo_billetera)
+          VALUES (${emailLower}, ${hash}, ${nombre}, ${celular || ''}, ${ciudad || 'Loja'}, false, 0.00)
+          ON CONFLICT (email) DO UPDATE SET 
+            password_hash = EXCLUDED.password_hash,
+            nombre = EXCLUDED.nombre,
+            celular = EXCLUDED.celular,
+            ciudad = EXCLUDED.ciudad
+          RETURNING id, email, nombre, celular, ciudad, es_verificado, saldo_billetera
+        `;
+      } catch {
+        const nuevoId = 'usr_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+        insertado = await sql`
+          INSERT INTO perfiles (id, email, password_hash, nombre, celular, ciudad, es_verificado, saldo_billetera)
+          VALUES (${nuevoId}, ${emailLower}, ${hash}, ${nombre}, ${celular || ''}, ${ciudad || 'Loja'}, false, 0.00)
+          ON CONFLICT (email) DO UPDATE SET 
+            password_hash = EXCLUDED.password_hash,
+            nombre = EXCLUDED.nombre,
+            celular = EXCLUDED.celular,
+            ciudad = EXCLUDED.ciudad
+          RETURNING id, email, nombre, celular, ciudad, es_verificado, saldo_billetera
+        `;
+      }
 
       const u = insertado[0];
       return NextResponse.json({
         success: true,
         user: {
-          id: u.id,
+          id: String(u.id),
           email: u.email,
           nombre: u.nombre,
           celular: u.celular || '',
@@ -128,16 +143,27 @@ export async function POST(request: Request) {
       const emailLower = email.trim().toLowerCase();
       const hashNuevo = await bcrypt.hash(password, 10);
 
-      const autoInsert = await sql`
-        INSERT INTO perfiles (email, password_hash, nombre, celular, ciudad, es_verificado, saldo_billetera)
-        VALUES (${emailLower}, ${hashNuevo}, 'Usuario Qvendes', '', 'Loja', false, 0.00)
-        ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash
-        RETURNING id, email, nombre, celular, ciudad, es_verificado, saldo_billetera
-      `;
+      let autoInsert;
+      try {
+        autoInsert = await sql`
+          INSERT INTO perfiles (email, password_hash, nombre, celular, ciudad, es_verificado, saldo_billetera)
+          VALUES (${emailLower}, ${hashNuevo}, ${emailLower.split('@')[0]}, '', 'Loja', false, 0.00)
+          ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash
+          RETURNING id, email, nombre, celular, ciudad, es_verificado, saldo_billetera
+        `;
+      } catch {
+        const nuevoId = 'usr_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+        autoInsert = await sql`
+          INSERT INTO perfiles (id, email, password_hash, nombre, celular, ciudad, es_verificado, saldo_billetera)
+          VALUES (${nuevoId}, ${emailLower}, ${hashNuevo}, ${emailLower.split('@')[0]}, '', 'Loja', false, 0.00)
+          ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash
+          RETURNING id, email, nombre, celular, ciudad, es_verificado, saldo_billetera
+        `;
+      }
 
       const u = autoInsert[0];
       const usuarioLimpio = {
-        id: u.id,
+        id: String(u.id),
         email: u.email,
         nombre: u.nombre || 'Usuario',
         celular: u.celular || '',

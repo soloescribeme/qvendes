@@ -99,7 +99,7 @@ export async function GET(request: Request) {
         p.email AS vendedor_email,
         COALESCE(p.es_verificado, false) AS vendedor_verificado
       FROM anuncios a
-      LEFT JOIN perfiles p ON a.vendedor_id = p.id
+      LEFT JOIN perfiles p ON a.vendedor_id::text = p.id::text
       WHERE (a.estado = 'activo' OR a.estado IS NULL OR a.estado = '')
       ORDER BY a.id DESC
     `;
