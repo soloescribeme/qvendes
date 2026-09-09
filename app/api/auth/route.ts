@@ -45,6 +45,45 @@ export async function POST(request: Request) {
       console.warn('Verificacion de tablas de perfiles:', e);
     }
 
+    // VERIFICACIÓN ESTRICTA DE SESIÓN CONTRA LA BASE DE DATOS REAL
+    if (action === 'verify') {
+      const targetId = parseInt(String(usuario_id));
+      const emailLower = (email || '').trim().toLowerCase();
+
+      let uResult = null;
+      if (!isNaN(targetId) && targetId > 0) {
+        uResult = await sql`
+          SELECT id, email, nombre, celular, ciudad, es_verificado, saldo_billetera 
+          FROM perfiles WHERE id = ${targetId}
+        `;
+      }
+
+      if ((!uResult || uResult.length === 0) && emailLower) {
+        uResult = await sql`
+          SELECT id, email, nombre, celular, ciudad, es_verificado, saldo_billetera 
+          FROM perfiles WHERE LOWER(email) = ${emailLower}
+        `;
+      }
+
+      if (!uResult || uResult.length === 0) {
+        return NextResponse.json({ success: false, error: 'Usuario no existe en la base de datos real.' }, { status: 404 });
+      }
+
+      const u = uResult[0];
+      return NextResponse.json({
+        success: true,
+        user: {
+          id: u.id,
+          email: u.email,
+          nombre: u.nombre || 'Usuario',
+          celular: u.celular || '',
+          ciudad: u.ciudad || 'Loja',
+          es_verificado: Boolean(u.es_verificado),
+          saldo_billetera: u.saldo_billetera ? parseFloat(u.saldo_billetera) : 0
+        }
+      });
+    }
+
     // 2. REGISTRO DIRECTO DE USUARIO (SIN CÓDIGO TEMPORALMENTE HASTA VERIFICAR DNS)
     if (action === 'register') {
       if (!email || !password || !nombre) {

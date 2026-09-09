@@ -165,11 +165,33 @@ export default function QvendesHome() {
     if (sesionGuardada) {
       try {
         const u = JSON.parse(sesionGuardada);
-        setUser(u);
-        setEditNombre(u.nombre || '');
-        setEditCelular(u.celular || '');
-        setEditCiudad(u.ciudad || 'Loja');
-      } catch {}
+        // REVALIDACIÓN ESTRICTA CONTRA LA BASE DE DATOS NEON
+        fetch('/api/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'verify', usuario_id: u.id, email: u.email })
+        })
+          .then(res => res.json())
+          .then(data => {
+            if (data.success && data.user) {
+              setUser(data.user);
+              setEditNombre(data.user.nombre || '');
+              setEditCelular(data.user.celular || '');
+              setEditCiudad(data.user.ciudad || 'Loja');
+              localStorage.setItem('qvendes_user', JSON.stringify(data.user));
+            } else {
+              // Si no existe en la base de datos de Neon, purgar de inmediato la sesion local
+              setUser(null);
+              localStorage.removeItem('qvendes_user');
+            }
+          })
+          .catch(() => {
+            setUser(null);
+            localStorage.removeItem('qvendes_user');
+          });
+      } catch {
+        localStorage.removeItem('qvendes_user');
+      }
     }
   }, []);
 
