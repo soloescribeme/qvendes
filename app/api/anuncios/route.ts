@@ -18,9 +18,11 @@ async function asegurarTablasAnuncios() {
         foto2 TEXT,
         foto3 TEXT,
         foto4 TEXT,
-        metodos_pago TEXT,
-        metodos_envio TEXT,
+        metodos_pago TEXT DEFAULT 'Efectivo / Transferencia Directa / Pago por plataforma Qvendes',
+        metodos_envio TEXT DEFAULT 'Entrega personal / Envío a provincias',
+        permitir_whatsapp BOOLEAN DEFAULT true,
         es_top BOOLEAN DEFAULT false,
+        es_premium BOOLEAN DEFAULT false,
         es_patrocinado BOOLEAN DEFAULT false,
         palabras_clave TEXT,
         franja_horaria_inicio VARCHAR(10),
@@ -43,9 +45,11 @@ async function asegurarTablasAnuncios() {
     await sql`ALTER TABLE anuncios ADD COLUMN IF NOT EXISTS foto2 TEXT`;
     await sql`ALTER TABLE anuncios ADD COLUMN IF NOT EXISTS foto3 TEXT`;
     await sql`ALTER TABLE anuncios ADD COLUMN IF NOT EXISTS foto4 TEXT`;
-    await sql`ALTER TABLE anuncios ADD COLUMN IF NOT EXISTS metodos_pago TEXT`;
-    await sql`ALTER TABLE anuncios ADD COLUMN IF NOT EXISTS metodos_envio TEXT`;
+    await sql`ALTER TABLE anuncios ADD COLUMN IF NOT EXISTS metodos_pago TEXT DEFAULT 'Efectivo / Transferencia Directa / Pago por plataforma Qvendes'`;
+    await sql`ALTER TABLE anuncios ADD COLUMN IF NOT EXISTS metodos_envio TEXT DEFAULT 'Entrega personal / Envío a provincias'`;
+    await sql`ALTER TABLE anuncios ADD COLUMN IF NOT EXISTS permitir_whatsapp BOOLEAN DEFAULT true`;
     await sql`ALTER TABLE anuncios ADD COLUMN IF NOT EXISTS es_top BOOLEAN DEFAULT false`;
+    await sql`ALTER TABLE anuncios ADD COLUMN IF NOT EXISTS es_premium BOOLEAN DEFAULT false`;
     await sql`ALTER TABLE anuncios ADD COLUMN IF NOT EXISTS es_patrocinado BOOLEAN DEFAULT false`;
     await sql`ALTER TABLE anuncios ADD COLUMN IF NOT EXISTS palabras_clave TEXT`;
     await sql`ALTER TABLE anuncios ADD COLUMN IF NOT EXISTS franja_horaria_inicio VARCHAR(10)`;
@@ -91,9 +95,11 @@ export async function GET(request: Request) {
         a.foto2,
         a.foto3,
         a.foto4,
-        a.metodos_pago,
-        a.metodos_envio,
+        COALESCE(a.metodos_pago, 'Efectivo / Transferencia Directa / Pago por plataforma Qvendes') AS metodos_pago,
+        COALESCE(a.metodos_envio, 'Entrega personal / Envío a provincias') AS metodos_envio,
+        COALESCE(a.permitir_whatsapp, true) AS permitir_whatsapp,
         COALESCE(a.es_top, false) AS es_top,
+        COALESCE(a.es_premium, false) AS es_premium,
         COALESCE(a.es_patrocinado, false) AS es_patrocinado,
         COALESCE(a.estado, 'activo') AS estado,
         a.creado_en,
@@ -145,19 +151,18 @@ export async function GET(request: Request) {
       filtrados = filtrados.filter(a => String(a.vendedor_id) === String(vendedorId));
     }
 
-    // SEPARAR ANUNCIOS TOP Y REGULARES
-    const topAds = filtrados.filter(a => a.es_top || a.es_patrocinado);
-    const regulares = filtrados.filter(a => !a.es_top && !a.es_patrocinado);
-
-    const regularesRandom = [...regulares];
-    for (let i = regularesRandom.length - 1; i > 0; i--) {
+    // MEZCLA ALEATORIA DINÁMICA DE ANUNCIOS NORMALES, TOP Y PREMIUM
+    const todosRandom = [...filtrados];
+    for (let i = todosRandom.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      [regularesRandom[i], regularesRandom[j]] = [regularesRandom[j], regularesRandom[i]];
+      [todosRandom[i], todosRandom[j]] = [todosRandom[j], todosRandom[i]];
     }
+
+    const topAds = filtrados.filter(a => a.es_top || a.es_premium || a.es_patrocinado);
 
     return NextResponse.json({
       top: topAds,
-      feed: regularesRandom,
+      feed: todosRandom,
       total: filtrados.length
     });
   } catch (error) {
@@ -170,7 +175,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { vendedor_id, vendedor_email, titulo, precio, condicion, categoria, ciudad, descripcion, foto1, foto2, foto3, foto4, metodos_pago, metodos_envio } = body;
+    const { vendedor_id, vendedor_email, titulo, precio, condicion, categoria, ciudad, descripcion, foto1, foto2, foto3, foto4, metodos_pago, metodos_envio, permitir_whatsapp } = body;
 
     await asegurarTablasAnuncios();
 
@@ -214,12 +219,14 @@ export async function POST(request: Request) {
     const insertado = await sql`
       INSERT INTO anuncios (
         vendedor_id, titulo, precio, condicion, categoria, ciudad, descripcion,
-        foto1, foto2, foto3, foto4, metodos_pago, metodos_envio, estado
+        foto1, foto2, foto3, foto4, metodos_pago, metodos_envio, permitir_whatsapp, estado
       ) VALUES (
         ${vId}, ${titulo}, ${parseFloat(precio)}, ${condicion || 'nuevo'},
         ${categoria || 'general'}, ${ciudad || 'Loja'}, ${descripcion || ''},
         ${foto1 || null}, ${foto2 || null}, ${foto3 || null}, ${foto4 || null},
-        ${metodos_pago || 'Efectivo / Transferencia'}, ${metodos_envio || 'Acuerdo personal'},
+        ${metodos_pago || 'Efectivo / Transferencia Directa / Pago por plataforma Qvendes'},
+        ${metodos_envio || 'Entrega personal / Envío a provincias'},
+        ${permitir_whatsapp !== false},
         'activo'
       )
       RETURNING id
@@ -232,5 +239,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: `Error del servidor: ${mensajeDetallado}` }, { status: 500 });
   }
 }
+
 
 
