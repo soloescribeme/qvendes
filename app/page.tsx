@@ -319,6 +319,13 @@ export default function QvendesHome() {
         setPubFoto3('');
         setPubFoto4('');
 
+        // Limpiar filtros activos para garantizar que la nueva publicación aparezca de inmediato en la pantalla principal
+        setFiltroCiudad('');
+        setFiltroCondicion('');
+        setFiltroPrecioMin('');
+        setFiltroPrecioMax('');
+        setBusqueda('');
+
         // Recargar anuncios de forma asíncrona no bloqueante
         cargarAnuncios().catch(() => {});
 

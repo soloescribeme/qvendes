@@ -1,6 +1,66 @@
 import { NextResponse } from 'next/server';
 import { sql } from '@/lib/db';
 
+async function asegurarTablasAnuncios() {
+  try {
+    await sql`CREATE SEQUENCE IF NOT EXISTS anuncios_id_seq`;
+    await sql`
+      CREATE TABLE IF NOT EXISTS anuncios (
+        id INT PRIMARY KEY DEFAULT nextval('anuncios_id_seq'),
+        vendedor_id INT NOT NULL,
+        titulo VARCHAR(255) NOT NULL,
+        precio NUMERIC(10, 2) NOT NULL,
+        condicion VARCHAR(50) DEFAULT 'nuevo',
+        categoria VARCHAR(100) DEFAULT 'general',
+        ciudad VARCHAR(100) DEFAULT 'Loja',
+        descripcion TEXT,
+        foto1 TEXT,
+        foto2 TEXT,
+        foto3 TEXT,
+        foto4 TEXT,
+        metodos_pago TEXT,
+        metodos_envio TEXT,
+        es_top BOOLEAN DEFAULT false,
+        es_patrocinado BOOLEAN DEFAULT false,
+        palabras_clave TEXT,
+        franja_horaria_inicio VARCHAR(10),
+        franja_horaria_fin VARCHAR(10),
+        fecha_vencimiento TIMESTAMP,
+        estado VARCHAR(50) DEFAULT 'activo',
+        creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
+
+    // Garantizar que existan todas las columnas si la tabla se creo con esquema previo
+    await sql`ALTER TABLE anuncios ADD COLUMN IF NOT EXISTS condicion VARCHAR(50) DEFAULT 'nuevo'`;
+    await sql`ALTER TABLE anuncios ADD COLUMN IF NOT EXISTS categoria VARCHAR(100) DEFAULT 'general'`;
+    await sql`ALTER TABLE anuncios ADD COLUMN IF NOT EXISTS ciudad VARCHAR(100) DEFAULT 'Loja'`;
+    await sql`ALTER TABLE anuncios ADD COLUMN IF NOT EXISTS descripcion TEXT`;
+    await sql`ALTER TABLE anuncios ADD COLUMN IF NOT EXISTS foto1 TEXT`;
+    await sql`ALTER TABLE anuncios ADD COLUMN IF NOT EXISTS foto2 TEXT`;
+    await sql`ALTER TABLE anuncios ADD COLUMN IF NOT EXISTS foto3 TEXT`;
+    await sql`ALTER TABLE anuncios ADD COLUMN IF NOT EXISTS foto4 TEXT`;
+    await sql`ALTER TABLE anuncios ADD COLUMN IF NOT EXISTS metodos_pago TEXT`;
+    await sql`ALTER TABLE anuncios ADD COLUMN IF NOT EXISTS metodos_envio TEXT`;
+    await sql`ALTER TABLE anuncios ADD COLUMN IF NOT EXISTS es_top BOOLEAN DEFAULT false`;
+    await sql`ALTER TABLE anuncios ADD COLUMN IF NOT EXISTS es_patrocinado BOOLEAN DEFAULT false`;
+    await sql`ALTER TABLE anuncios ADD COLUMN IF NOT EXISTS palabras_clave TEXT`;
+    await sql`ALTER TABLE anuncios ADD COLUMN IF NOT EXISTS franja_horaria_inicio VARCHAR(10)`;
+    await sql`ALTER TABLE anuncios ADD COLUMN IF NOT EXISTS franja_horaria_fin VARCHAR(10)`;
+    await sql`ALTER TABLE anuncios ADD COLUMN IF NOT EXISTS fecha_vencimiento TIMESTAMP`;
+    await sql`ALTER TABLE anuncios ADD COLUMN IF NOT EXISTS estado VARCHAR(50) DEFAULT 'activo'`;
+
+    // Garantizar columnas en perfiles para el LEFT JOIN
+    await sql`ALTER TABLE perfiles ADD COLUMN IF NOT EXISTS es_verificado BOOLEAN DEFAULT false`;
+    await sql`ALTER TABLE perfiles ADD COLUMN IF NOT EXISTS celular VARCHAR(50)`;
+
+    // Asegurar que anuncios sin estado queden activos
+    await sql`UPDATE anuncios SET estado = 'activo' WHERE estado IS NULL OR estado = ''`;
+  } catch (e) {
+    console.warn('Verificacion/Auto-migracion de anuncios:', e);
+  }
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -11,59 +71,28 @@ export async function GET(request: Request) {
     const precioMax = searchParams.get('precio_max');
     const vendedorId = searchParams.get('vendedor_id');
 
-    // 1. INICIALIZAR Y VERIFICAR TABLA DE ANUNCIOS
-    try {
-      await sql`CREATE SEQUENCE IF NOT EXISTS anuncios_id_seq`;
-      await sql`
-        CREATE TABLE IF NOT EXISTS anuncios (
-          id INT PRIMARY KEY DEFAULT nextval('anuncios_id_seq'),
-          vendedor_id INT NOT NULL,
-          titulo VARCHAR(255) NOT NULL,
-          precio NUMERIC(10, 2) NOT NULL,
-          condicion VARCHAR(50) DEFAULT 'nuevo',
-          categoria VARCHAR(100) DEFAULT 'general',
-          ciudad VARCHAR(100) DEFAULT 'Loja',
-          descripcion TEXT,
-          foto1 TEXT,
-          foto2 TEXT,
-          foto3 TEXT,
-          foto4 TEXT,
-          metodos_pago TEXT,
-          metodos_envio TEXT,
-          es_top BOOLEAN DEFAULT false,
-          es_patrocinado BOOLEAN DEFAULT false,
-          palabras_clave TEXT,
-          franja_horaria_inicio VARCHAR(10),
-          franja_horaria_fin VARCHAR(10),
-          fecha_vencimiento TIMESTAMP,
-          estado VARCHAR(50) DEFAULT 'activo',
-          creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-      `;
-    } catch {
-      // Ignorar si existe
-    }
+    await asegurarTablasAnuncios();
 
-    // 2. CONSULTAR ANUNCIOS CON JOIN DE VENDEDOR
+    // CONSULTAR ANUNCIOS CON JOIN DE VENDEDOR DE FORMA SEGURA
     const todosAnuncios = await sql`
       SELECT 
         a.id,
         a.vendedor_id,
         a.titulo,
         a.precio::float AS precio,
-        a.condicion,
-        a.categoria,
-        a.ciudad,
-        a.descripcion,
+        COALESCE(a.condicion, 'nuevo') AS condicion,
+        COALESCE(a.categoria, 'general') AS categoria,
+        COALESCE(a.ciudad, 'Loja') AS ciudad,
+        COALESCE(a.descripcion, '') AS descripcion,
         a.foto1,
         a.foto2,
         a.foto3,
         a.foto4,
         a.metodos_pago,
         a.metodos_envio,
-        a.es_top,
-        a.es_patrocinado,
-        a.estado,
+        COALESCE(a.es_top, false) AS es_top,
+        COALESCE(a.es_patrocinado, false) AS es_patrocinado,
+        COALESCE(a.estado, 'activo') AS estado,
         a.creado_en,
         COALESCE(p.nombre, 'Vendedor Certificado') AS vendedor_nombre,
         p.celular AS vendedor_celular,
@@ -71,45 +100,49 @@ export async function GET(request: Request) {
         COALESCE(p.es_verificado, false) AS vendedor_verificado
       FROM anuncios a
       LEFT JOIN perfiles p ON a.vendedor_id = p.id
-      WHERE a.estado = 'activo'
+      WHERE (a.estado = 'activo' OR a.estado IS NULL OR a.estado = '')
       ORDER BY a.id DESC
     `;
 
-    // 3. APLICAR FILTROS
+    // APLICAR FILTROS DE FORMA SEGURA CONTRA VALORES NULL
     let filtrados = todosAnuncios;
 
     if (q.trim()) {
       const term = q.toLowerCase().trim();
       filtrados = filtrados.filter(a => 
-        a.titulo.toLowerCase().includes(term) || 
-        (a.descripcion && a.descripcion.toLowerCase().includes(term)) ||
-        (a.categoria && a.categoria.toLowerCase().includes(term))
+        (a.titulo && String(a.titulo).toLowerCase().includes(term)) || 
+        (a.descripcion && String(a.descripcion).toLowerCase().includes(term)) ||
+        (a.categoria && String(a.categoria).toLowerCase().includes(term))
       );
     }
 
     if (ciudad.trim()) {
-      filtrados = filtrados.filter(a => a.ciudad.toLowerCase() === ciudad.toLowerCase().trim());
+      filtrados = filtrados.filter(a => 
+        a.ciudad && String(a.ciudad).toLowerCase().trim() === ciudad.toLowerCase().trim()
+      );
     }
 
     if (condicion.trim()) {
-      filtrados = filtrados.filter(a => a.condicion.toLowerCase() === condicion.toLowerCase().trim());
+      filtrados = filtrados.filter(a => 
+        a.condicion && String(a.condicion).toLowerCase().trim() === condicion.toLowerCase().trim()
+      );
     }
 
     if (precioMin) {
       const min = parseFloat(precioMin);
-      if (!isNaN(min)) filtrados = filtrados.filter(a => a.precio >= min);
+      if (!isNaN(min)) filtrados = filtrados.filter(a => (a.precio || 0) >= min);
     }
 
     if (precioMax) {
       const max = parseFloat(precioMax);
-      if (!isNaN(max)) filtrados = filtrados.filter(a => a.precio <= max);
+      if (!isNaN(max)) filtrados = filtrados.filter(a => (a.precio || 0) <= max);
     }
 
     if (vendedorId) {
       filtrados = filtrados.filter(a => String(a.vendedor_id) === String(vendedorId));
     }
 
-    // 4. SEPARAR ANUNCIOS TOP Y ANUNCIOS REGULARES CON ORDEN ALEATORIO RÁNDOM
+    // SEPARAR ANUNCIOS TOP Y REGULARES
     const topAds = filtrados.filter(a => a.es_top || a.es_patrocinado);
     const regulares = filtrados.filter(a => !a.es_top && !a.es_patrocinado);
 
@@ -126,7 +159,8 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     console.error('Error al consultar anuncios en Qvendes:', error);
-    return NextResponse.json({ top: [], feed: [], total: 0 }, { status: 200 });
+    const msg = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ top: [], feed: [], total: 0, error: msg }, { status: 200 });
   }
 }
 
@@ -134,6 +168,8 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { vendedor_id, vendedor_email, titulo, precio, condicion, categoria, ciudad, descripcion, foto1, foto2, foto3, foto4, metodos_pago, metodos_envio } = body;
+
+    await asegurarTablasAnuncios();
 
     let vId = parseInt(String(vendedor_id));
 
@@ -161,46 +197,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'El título y el precio son obligatorios.' }, { status: 400 });
     }
 
-    // 1. INICIALIZAR TABLA DE ANUNCIOS EN NEON DB
-    try {
-      await sql`CREATE SEQUENCE IF NOT EXISTS anuncios_id_seq`;
-      await sql`
-        CREATE TABLE IF NOT EXISTS anuncios (
-          id INT PRIMARY KEY DEFAULT nextval('anuncios_id_seq'),
-          vendedor_id INT NOT NULL,
-          titulo VARCHAR(255) NOT NULL,
-          precio NUMERIC(10, 2) NOT NULL,
-          condicion VARCHAR(50) DEFAULT 'nuevo',
-          categoria VARCHAR(100) DEFAULT 'general',
-          ciudad VARCHAR(100) DEFAULT 'Loja',
-          descripcion TEXT,
-          foto1 TEXT,
-          foto2 TEXT,
-          foto3 TEXT,
-          foto4 TEXT,
-          metodos_pago TEXT,
-          metodos_envio TEXT,
-          es_top BOOLEAN DEFAULT false,
-          es_patrocinado BOOLEAN DEFAULT false,
-          palabras_clave TEXT,
-          franja_horaria_inicio VARCHAR(10),
-          franja_horaria_fin VARCHAR(10),
-          fecha_vencimiento TIMESTAMP,
-          estado VARCHAR(50) DEFAULT 'activo',
-          creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-      `;
-    } catch {}
-
     const insertado = await sql`
       INSERT INTO anuncios (
         vendedor_id, titulo, precio, condicion, categoria, ciudad, descripcion,
-        foto1, foto2, foto3, foto4, metodos_pago, metodos_envio
+        foto1, foto2, foto3, foto4, metodos_pago, metodos_envio, estado
       ) VALUES (
         ${vId}, ${titulo}, ${parseFloat(precio)}, ${condicion || 'nuevo'},
         ${categoria || 'general'}, ${ciudad || 'Loja'}, ${descripcion || ''},
         ${foto1 || null}, ${foto2 || null}, ${foto3 || null}, ${foto4 || null},
-        ${metodos_pago || 'Efectivo / Transferencia'}, ${metodos_envio || 'Acuerdo personal'}
+        ${metodos_pago || 'Efectivo / Transferencia'}, ${metodos_envio || 'Acuerdo personal'},
+        'activo'
       )
       RETURNING id
     `;
@@ -212,3 +218,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: `Error del servidor: ${mensajeDetallado}` }, { status: 500 });
   }
 }
+
