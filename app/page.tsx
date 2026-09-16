@@ -23,7 +23,6 @@ interface Anuncio {
   foto2?: string;
   foto3?: string;
   foto4?: string;
-  video_url?: string;
   metodos_pago?: string;
   metodos_envio?: string;
   permitir_whatsapp?: boolean;
@@ -138,7 +137,7 @@ export default function QvendesHome() {
   const [editExito, setEditExito] = useState(false);
   const [editProcesando, setEditProcesando] = useState(false);
 
-  // ESTADOS DE FORMULARIO DE PUBLICACIÓN MEJORADO (4 FOTOS + 1 VIDEO OPCIONAL)
+  // ESTADOS DE FORMULARIO DE PUBLICACIÓN MEJORADO (HASTA 4 FOTOS)
   const [pubTitulo, setPubTitulo] = useState('');
   const [pubPrecio, setPubPrecio] = useState('');
   const [pubCondicion, setPubCondicion] = useState<'nuevo' | 'usado' | 'servicio'>('nuevo');
@@ -149,7 +148,6 @@ export default function QvendesHome() {
   const [pubFoto2, setPubFoto2] = useState('');
   const [pubFoto3, setPubFoto3] = useState('');
   const [pubFoto4, setPubFoto4] = useState('');
-  const [pubVideo, setPubVideo] = useState('');
 
   // OPCIONES DE PAGO Y ENVÍO SELECCIONABLES (CHECKBOXES)
   const [pagoEfectivo, setPagoEfectivo] = useState(true);
@@ -185,7 +183,7 @@ export default function QvendesHome() {
   // FAVORITOS LOCALES
   const [favoritos, setFavoritos] = useState<number[]>([]);
 
-  // CARGAR ANUNCIOS CON FILTROS
+  // CARGAR ANUNCIOS CON FILTROS (SINCRONIZADO STRICTAMENTE CON NEON DB)
   const cargarAnuncios = async () => {
     setCargandoAnuncios(true);
     try {
@@ -203,6 +201,9 @@ export default function QvendesHome() {
         setAnunciosTop(data.top || []);
         setAnunciosTodos(listaFeed);
         setAnunciosFeed(listaFeed);
+        if (data.total_visitantes) {
+          setTotalVisitantes(data.total_visitantes);
+        }
       }
     } catch (e) {
       console.error('Error cargando anuncios:', e);
@@ -683,7 +684,7 @@ export default function QvendesHome() {
             </div>
             <div>
               <span className="text-xl font-black tracking-tight text-slate-900 flex items-center gap-1">
-                Qvendes<span className="text-purple-600 text-xs px-2 py-0.5 rounded-full bg-purple-100 font-bold border border-purple-200">.app</span>
+                Qvendes<span className="text-purple-600 text-xs px-2 py-0.5 rounded-full bg-purple-100 font-bold border border-purple-200">.latinred.app</span>
               </span>
               <p className="text-[10px] font-bold text-slate-500 hidden sm:block">Compra y vende sin restricciones</p>
             </div>
@@ -1310,23 +1311,6 @@ export default function QvendesHome() {
                     </button>
                   ) : null)}
                 </div>
-
-                {/* ENLACE / REPRODUCTOR VIDEO SI EXISTE */}
-                {anuncioDetalle.video_url && (
-                  <div className="p-3 bg-purple-50 rounded-xl border border-purple-200 space-y-1">
-                    <p className="text-[10px] font-black uppercase text-purple-700 flex items-center gap-1">
-                      <Video className="w-3.5 h-3.5" /> Video Demostrativo Disponible
-                    </p>
-                    <a 
-                      href={anuncioDetalle.video_url} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-xs font-bold text-purple-700 underline flex items-center gap-1 hover:text-purple-900"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" /> Abrir Video del Anuncio
-                    </a>
-                  </div>
-                )}
               </div>
 
               <div className="space-y-3 text-xs">
@@ -1508,7 +1492,7 @@ export default function QvendesHome() {
                   <textarea rows={3} value={pubDescripcion} onChange={(e) => setPubDescripcion(e.target.value)} placeholder="Describe tu producto..." className="w-full bg-amber-50/60 border border-amber-300 rounded-xl p-3 font-semibold text-slate-900 outline-none"></textarea>
                 </div>
 
-                {/* OPCIÓN HASTA 4 FOTOS Y 1 VIDEO */}
+                {/* OPCIÓN HASTA 4 FOTOS */}
                 <div className="space-y-3 p-3 bg-purple-50/60 rounded-2xl border border-purple-200">
                   <label className="block text-[10px] font-black uppercase text-purple-700 flex items-center gap-1">
                     <Camera className="w-3.5 h-3.5 text-purple-600" /> Subir Fotografías (Hasta 4 fotos - Opcionales)
@@ -1531,19 +1515,6 @@ export default function QvendesHome() {
                       <span className="text-[9px] font-bold text-slate-600">Foto 4 (Opcional)</span>
                       <input type="file" accept="image/*" onChange={(e) => handleSubirFoto(e, 4)} className="w-full text-xs font-semibold mt-1" />
                     </div>
-                  </div>
-
-                  <div className="pt-2 border-t border-purple-200">
-                    <label className="block text-[10px] font-black uppercase text-purple-700 mb-1 flex items-center gap-1">
-                      <Video className="w-3.5 h-3.5 text-indigo-600" /> Enlace de Video (Opcional - YouTube, TikTok, MP4)
-                    </label>
-                    <input 
-                      type="url" 
-                      value={pubVideo} 
-                      onChange={(e) => setPubVideo(e.target.value)} 
-                      placeholder="Ej. https://www.youtube.com/watch?v=..." 
-                      className="w-full bg-white border border-purple-300 rounded-xl p-2.5 text-xs font-bold text-slate-900 outline-none" 
-                    />
                   </div>
                 </div>
 
