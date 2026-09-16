@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { 
   Search, Plus, ShieldCheck, Heart, Share2, MessageSquare, Tag, Flag, 
   MapPin, CheckCircle2, Lock, User, Star, SlidersHorizontal, Sparkles, 
   LogOut, LogIn, UserCheck, X, Camera, DollarSign, Send, Phone, MessageCircle,
-  Eye, EyeOff, Save, Check, Crown, Zap, Wallet, CreditCard, ExternalLink, Package
+  Eye, EyeOff, Save, Check, Crown, Zap, Wallet, CreditCard, ExternalLink, Package,
+  Video, Film, PlusCircle
 } from 'lucide-react';
 
 interface Anuncio {
@@ -22,6 +23,7 @@ interface Anuncio {
   foto2?: string;
   foto3?: string;
   foto4?: string;
+  video_url?: string;
   metodos_pago?: string;
   metodos_envio?: string;
   permitir_whatsapp?: boolean;
@@ -64,18 +66,41 @@ export default function QvendesHome() {
   // USUARIO EN SESIÓN (Autenticación estricta Neon DB)
   const [user, setUser] = useState<{ id: string | number; nombre: string; email: string; celular?: string; ciudad?: string; es_verificado: boolean; saldo_billetera: number } | null>(null);
 
-  // ANUNCIOS Y FEED
+  // ANUNCIOS Y FEED (FILTRO INSTANTÁNEO Y VISITANTES)
   const [anunciosTop, setAnunciosTop] = useState<Anuncio[]>([]);
   const [anunciosFeed, setAnunciosFeed] = useState<Anuncio[]>([]);
+  const [anunciosTodos, setAnunciosTodos] = useState<Anuncio[]>([]);
   const [cargandoAnuncios, setCargandoAnuncios] = useState(true);
+  const [totalVisitantes, setTotalVisitantes] = useState(1485);
 
-  // FILTROS DE BÚSQUEDA
+  // FILTROS DE BÚSQUEDA INSTANTÁNEOS
   const [busqueda, setBusqueda] = useState('');
   const [filtroCiudad, setFiltroCiudad] = useState('');
   const [filtroCondicion, setFiltroCondicion] = useState('');
+  const [filtroCategoria, setFiltroCategoria] = useState('');
   const [filtroPrecioMin, setFiltroPrecioMin] = useState('');
   const [filtroPrecioMax, setFiltroPrecioMax] = useState('');
   const [mostrarFiltrosAvanzados, setMostrarFiltrosAvanzados] = useState(false);
+
+  // CATEGORÍAS COMPLETAS SOLICITADAS + OPCIÓN AGREGAR NUEVA
+  const [categoriasLista, setCategoriasLista] = useState<string[]>([
+    'Vehículos',
+    'Casas',
+    'Herramientas',
+    'Maquinarias',
+    'Computación',
+    'Audio y Video',
+    'Servicios Profesionales',
+    'Mano de Obra',
+    'Empleos',
+    'Trueque',
+    'Transportes',
+    'Alquiler',
+    'Compra',
+    'Venta'
+  ]);
+  const [mostrarInputNuevaCat, setMostrarInputNuevaCat] = useState(false);
+  const [nuevaCatNombre, setNuevaCatNombre] = useState('');
 
   // MODALES PRINCIPALES
   const [anuncioDetalle, setAnuncioDetalle] = useState<Anuncio | null>(null);
@@ -113,7 +138,7 @@ export default function QvendesHome() {
   const [editExito, setEditExito] = useState(false);
   const [editProcesando, setEditProcesando] = useState(false);
 
-  // ESTADOS DE FORMULARIO DE PUBLICACIÓN MEJORADO
+  // ESTADOS DE FORMULARIO DE PUBLICACIÓN MEJORADO (4 FOTOS + 1 VIDEO OPCIONAL)
   const [pubTitulo, setPubTitulo] = useState('');
   const [pubPrecio, setPubPrecio] = useState('');
   const [pubCondicion, setPubCondicion] = useState<'nuevo' | 'usado' | 'servicio'>('nuevo');
@@ -124,6 +149,7 @@ export default function QvendesHome() {
   const [pubFoto2, setPubFoto2] = useState('');
   const [pubFoto3, setPubFoto3] = useState('');
   const [pubFoto4, setPubFoto4] = useState('');
+  const [pubVideo, setPubVideo] = useState('');
 
   // OPCIONES DE PAGO Y ENVÍO SELECCIONABLES (CHECKBOXES)
   const [pagoEfectivo, setPagoEfectivo] = useState(true);
@@ -144,6 +170,7 @@ export default function QvendesHome() {
   const [mensajesThread, setMensajesThread] = useState<MensajeItem[]>([]);
   const [nuevoMensajeTexto, setNuevoMensajeTexto] = useState('');
   const [enviandoMensaje, setEnviandoMensaje] = useState(false);
+  const mensajesEndRef = useRef<HTMLDivElement>(null);
 
   // PROMOCIONES DE ANUNCIO (TOP $1 / PREMIUM $1.50)
   const [anuncioAPromocionar, setAnuncioAPromocionar] = useState<Anuncio | null>(null);
@@ -172,14 +199,44 @@ export default function QvendesHome() {
       const res = await fetch(`/api/anuncios?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
+        const listaFeed: Anuncio[] = data.feed || [];
         setAnunciosTop(data.top || []);
-        setAnunciosFeed(data.feed || []);
+        setAnunciosTodos(listaFeed);
+        setAnunciosFeed(listaFeed);
       }
     } catch (e) {
       console.error('Error cargando anuncios:', e);
     } finally {
       setCargandoAnuncios(false);
     }
+  };
+
+  // AUTO SCROLL EN EL CHAT AL RECIBIR/ENVIAR MENSAJES
+  useEffect(() => {
+    if (mensajesThread.length > 0) {
+      mensajesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [mensajesThread]);
+
+  // FILTRADO INSTANTÁNEO EN MEMORIA (0MS DELAY)
+  const aplicarFiltroCondicionRapido = (cond: string) => {
+    setFiltroCondicion(cond);
+    if (!cond) {
+      setAnunciosFeed(anunciosTodos);
+      return;
+    }
+    const filtrados = anunciosTodos.filter(a => (a.condicion || '').toLowerCase() === cond.toLowerCase());
+    setAnunciosFeed(filtrados);
+  };
+
+  const aplicarFiltroCategoriaRapido = (cat: string) => {
+    setFiltroCategoria(cat);
+    if (!cat) {
+      setAnunciosFeed(anunciosTodos);
+      return;
+    }
+    const filtrados = anunciosTodos.filter(a => (a.categoria || '').toLowerCase() === cat.toLowerCase());
+    setAnunciosFeed(filtrados);
   };
 
   useEffect(() => {
@@ -403,6 +460,7 @@ export default function QvendesHome() {
           foto2: pubFoto2,
           foto3: pubFoto3,
           foto4: pubFoto4,
+          video_url: pubVideo,
           metodos_pago: metodosPagoTexto,
           metodos_envio: metodosEnvioTexto,
           permitir_whatsapp: pubPermitirWhatsapp
@@ -420,6 +478,7 @@ export default function QvendesHome() {
         setPubFoto2('');
         setPubFoto3('');
         setPubFoto4('');
+        setPubVideo('');
 
         // Limpiar filtros activos para visibilidad inmediata
         setFiltroCiudad('');
@@ -498,7 +557,23 @@ export default function QvendesHome() {
     e.preventDefault();
     if (!user || !chatAnuncioActivo || !nuevoMensajeTexto.trim()) return;
 
+    const textoMensaje = nuevoMensajeTexto.trim();
+    setNuevoMensajeTexto('');
     setEnviandoMensaje(true);
+
+    // ACTUALIZACIÓN OPTIMISTA INMEDIATA EN EL CUADRO DE CHAT
+    const nuevoItemMsg: MensajeItem = {
+      id: Date.now(),
+      anuncio_id: chatAnuncioActivo.id,
+      emisor_id: String(user.id),
+      receptor_id: String(chatAnuncioActivo.vendedor_id),
+      mensaje: textoMensaje,
+      emisor_nombre: user.nombre,
+      creado_en: new Date().toISOString()
+    };
+
+    setMensajesThread(prev => [...prev, nuevoItemMsg]);
+
     try {
       const res = await fetch('/api/mensajes', {
         method: 'POST',
@@ -507,13 +582,12 @@ export default function QvendesHome() {
           anuncio_id: chatAnuncioActivo.id,
           emisor_id: user.id,
           receptor_id: chatAnuncioActivo.vendedor_id,
-          mensaje: nuevoMensajeTexto
+          mensaje: textoMensaje
         })
       });
 
       const data = await res.json();
       if (res.ok && data.success) {
-        setNuevoMensajeTexto('');
         cargarHiloMensajes(chatAnuncioActivo.id, chatAnuncioActivo.vendedor_id);
       } else {
         alert(`Error al enviar mensaje: ${data.error || 'Intenta de nuevo'}`);
@@ -523,6 +597,21 @@ export default function QvendesHome() {
     } finally {
       setEnviandoMensaje(false);
     }
+  };
+
+  // MANEJADOR PARA CONVERTIR FOTOS A BASE64 (HASTA 4 FOTOS)
+  const handleSubirFoto = (e: React.ChangeEvent<HTMLInputElement>, index: 1 | 2 | 3 | 4) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64 = reader.result as string;
+      if (index === 1) setPubFoto1(base64);
+      if (index === 2) setPubFoto2(base64);
+      if (index === 3) setPubFoto3(base64);
+      if (index === 4) setPubFoto4(base64);
+    };
+    reader.readAsDataURL(file);
   };
 
   // ACTIVAR PROMOCIÓN TOP O PREMIUM DESCONTANDO SALDO
@@ -596,7 +685,7 @@ export default function QvendesHome() {
               <span className="text-xl font-black tracking-tight text-slate-900 flex items-center gap-1">
                 Qvendes<span className="text-purple-600 text-xs px-2 py-0.5 rounded-full bg-purple-100 font-bold border border-purple-200">.app</span>
               </span>
-              <p className="text-[10px] font-bold text-slate-500 hidden sm:block">Mercado Libre de Ecuador</p>
+              <p className="text-[10px] font-bold text-slate-500 hidden sm:block">Compra y vende sin restricciones</p>
             </div>
           </div>
 
@@ -689,7 +778,7 @@ export default function QvendesHome() {
       </header>
 
       {/* 🔍 BARRA DE FILTROS & BUSCADOR PRINCIPAL (MÓVIL & GENERAL) */}
-      <section className="bg-amber-100/40 border-b border-amber-200/60 py-4 px-4">
+      <section className="bg-amber-100/40 border-b border-amber-200/60 py-4 px-4 space-y-3">
         <div className="max-w-7xl mx-auto space-y-3">
           
           <form onSubmit={handleSearchSubmit} className="flex gap-2">
@@ -698,7 +787,7 @@ export default function QvendesHome() {
                 type="text" 
                 value={busqueda} 
                 onChange={(e) => setBusqueda(e.target.value)} 
-                placeholder="¿Qué estás buscando? (Ej. iPhone, Camioneta, Servicio...)" 
+                placeholder="¿Qué estás buscando? (Ej. Laptop, Moto, Servicio...)" 
                 className="w-full bg-white border border-amber-300 rounded-2xl py-3 pl-4 pr-10 text-xs font-semibold text-slate-900 outline-none focus:border-purple-600 shadow-sm"
               />
               <button type="submit" className="absolute right-3 top-1/2 -translate-y-1/2 text-purple-600">
@@ -743,44 +832,70 @@ export default function QvendesHome() {
                 <button type="button" onClick={cargarAnuncios} className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2.5 rounded-xl text-xs font-black uppercase tracking-wider shadow">
                   Aplicar
                 </button>
-                <button type="button" onClick={() => { setFiltroCiudad(''); setFiltroCondicion(''); setFiltroPrecioMin(''); setFiltroPrecioMax(''); setBusqueda(''); cargarAnuncios(); }} className="bg-amber-200 text-amber-900 px-3 py-2.5 rounded-xl text-xs font-bold">
+                <button type="button" onClick={() => { setFiltroCiudad(''); setFiltroCondicion(''); setFiltroCategoria(''); setFiltroPrecioMin(''); setFiltroPrecioMax(''); setBusqueda(''); cargarAnuncios(); }} className="bg-amber-200 text-amber-900 px-3 py-2.5 rounded-xl text-xs font-bold">
                   Limpiar
                 </button>
               </div>
             </div>
           )}
 
-          {/* FILTROS RÁPIDOS POR CONDICIÓN */}
+          {/* FILTROS RÁPIDOS INSTANTÁNEOS POR CONDICIÓN */}
           <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
             <span className="font-bold text-slate-500 text-[11px] uppercase tracking-wider mr-1">Condición:</span>
-            <button type="button" onClick={() => { setFiltroCondicion(''); cargarAnuncios(); }} className={`px-3 py-1.5 rounded-xl border ${!filtroCondicion ? 'bg-purple-600 text-white border-purple-600 font-bold shadow-sm' : 'bg-white text-slate-700 border-amber-300 font-semibold'}`}>
+            <button type="button" onClick={() => aplicarFiltroCondicionRapido('')} className={`px-3 py-1.5 rounded-xl border transition-all ${!filtroCondicion ? 'bg-purple-600 text-white border-purple-600 font-bold shadow-sm' : 'bg-white text-slate-700 border-amber-300 font-semibold hover:border-purple-400'}`}>
               Todos
             </button>
-            <button type="button" onClick={() => { setFiltroCondicion('nuevo'); cargarAnuncios(); }} className={`px-3 py-1.5 rounded-xl border ${filtroCondicion === 'nuevo' ? 'bg-purple-600 text-white border-purple-600 font-bold shadow-sm' : 'bg-white text-slate-700 border-amber-300 font-semibold'}`}>
+            <button type="button" onClick={() => aplicarFiltroCondicionRapido('nuevo')} className={`px-3 py-1.5 rounded-xl border transition-all ${filtroCondicion === 'nuevo' ? 'bg-purple-600 text-white border-purple-600 font-bold shadow-sm' : 'bg-white text-slate-700 border-amber-300 font-semibold hover:border-purple-400'}`}>
               ✨ Nuevos
             </button>
-            <button type="button" onClick={() => { setFiltroCondicion('usado'); cargarAnuncios(); }} className={`px-3 py-1.5 rounded-xl border ${filtroCondicion === 'usado' ? 'bg-purple-600 text-white border-purple-600 font-bold shadow-sm' : 'bg-white text-slate-700 border-amber-300 font-semibold'}`}>
+            <button type="button" onClick={() => aplicarFiltroCondicionRapido('usado')} className={`px-3 py-1.5 rounded-xl border transition-all ${filtroCondicion === 'usado' ? 'bg-purple-600 text-white border-purple-600 font-bold shadow-sm' : 'bg-white text-slate-700 border-amber-300 font-semibold hover:border-purple-400'}`}>
               📦 Usados
             </button>
-            <button type="button" onClick={() => { setFiltroCondicion('servicio'); cargarAnuncios(); }} className={`px-3 py-1.5 rounded-xl border ${filtroCondicion === 'servicio' ? 'bg-purple-600 text-white border-purple-600 font-bold shadow-sm' : 'bg-white text-slate-700 border-amber-300 font-semibold'}`}>
+            <button type="button" onClick={() => aplicarFiltroCondicionRapido('servicio')} className={`px-3 py-1.5 rounded-xl border transition-all ${filtroCondicion === 'servicio' ? 'bg-purple-600 text-white border-purple-600 font-bold shadow-sm' : 'bg-white text-slate-700 border-amber-300 font-semibold hover:border-purple-400'}`}>
               🛠️ Servicios
             </button>
+          </div>
+
+          {/* FILTROS RÁPIDOS INSTANTÁNEOS POR CATEGORÍA */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px]">
+            <span className="font-bold text-slate-500 text-[11px] uppercase tracking-wider mr-1">Categorías:</span>
+            <button type="button" onClick={() => aplicarFiltroCategoriaRapido('')} className={`px-2.5 py-1 rounded-lg border transition-all whitespace-nowrap ${!filtroCategoria ? 'bg-indigo-600 text-white border-indigo-600 font-bold' : 'bg-white text-slate-600 border-amber-200 hover:border-indigo-400'}`}>
+              Todas
+            </button>
+            {categoriasLista.map(cat => (
+              <button 
+                key={cat} 
+                type="button" 
+                onClick={() => aplicarFiltroCategoriaRapido(cat)} 
+                className={`px-2.5 py-1 rounded-lg border transition-all whitespace-nowrap ${filtroCategoria === cat ? 'bg-indigo-600 text-white border-indigo-600 font-bold' : 'bg-white text-slate-600 border-amber-200 hover:border-indigo-400'}`}
+              >
+                {cat}
+              </button>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* 🛍️ FEED DE ANUNCIOS EN PORTADA (GRID MÁS COMPACTO Y MEZCLA ALEATORIA DINÁMICA) */}
+      {/* 🛍️ FEED DE ANUNCIOS EN PORTADA */}
       <main className="max-w-7xl mx-auto px-4 py-6 flex-1 w-full space-y-6">
 
         {/* FEED PRINCIPAL */}
         <section className="space-y-4">
-          <div className="flex items-center justify-between border-b border-amber-200/80 pb-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200/80 pb-3">
             <h2 className="text-sm sm:text-base font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
               🛍️ Catálogo de Publicaciones ({anunciosFeed.length})
             </h2>
-            <span className="text-[11px] font-bold text-amber-700 bg-amber-100 px-2.5 py-1 rounded-full border border-amber-200">
-              🔀 Orden Aleatorio Dinámico
-            </span>
+
+            {/* ESTADÍSTICAS EN UNA SOLA LÍNEA */}
+            <div className="flex items-center gap-3 text-[11px] font-bold text-slate-700 bg-amber-100/90 px-3 py-1 rounded-full border border-amber-200 shadow-sm">
+              <span className="flex items-center gap-1">
+                <Eye className="w-3.5 h-3.5 text-purple-600" /> Visitantes: <strong className="text-purple-700">{totalVisitantes}</strong>
+              </span>
+              <span className="text-amber-300">|</span>
+              <span className="flex items-center gap-1">
+                <Package className="w-3.5 h-3.5 text-indigo-600" /> Total Anuncios: <strong className="text-indigo-700">{anunciosTodos.length}</strong>
+              </span>
+            </div>
           </div>
 
           {cargandoAnuncios ? (
@@ -1137,6 +1252,7 @@ export default function QvendesHome() {
                   </div>
                 );
               })}
+              <div ref={mensajesEndRef} />
             </div>
 
             <form onSubmit={handleEnviarMensaje} className="flex gap-2">
@@ -1155,7 +1271,7 @@ export default function QvendesHome() {
         </div>
       )}
 
-      {/* 📢 MODAL DETALLE DE ANUNCIOS */}
+      {/* 📢 MODAL DETALLE DE ANUNCIOS (CON GALERÍA 4 FOTOS Y VIDEO) */}
       {anuncioDetalle && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-white border border-amber-300 rounded-3xl max-w-2xl w-full p-6 sm:p-8 space-y-5 shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -1165,16 +1281,57 @@ export default function QvendesHome() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="h-60 bg-amber-100 rounded-2xl overflow-hidden border border-amber-200 relative flex items-center justify-center">
-                {anuncioDetalle.foto1 ? (
-                  <img src={anuncioDetalle.foto1} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="text-4xl text-amber-300">📦</div>
+              <div className="space-y-2">
+                <div className="h-60 bg-amber-100 rounded-2xl overflow-hidden border border-amber-200 relative flex items-center justify-center">
+                  {fotoSeleccionadaIndex === 0 && (
+                    anuncioDetalle.foto1 ? <img src={anuncioDetalle.foto1} className="w-full h-full object-cover" /> : <div className="text-4xl text-amber-300">📦</div>
+                  )}
+                  {fotoSeleccionadaIndex === 1 && (
+                    anuncioDetalle.foto2 ? <img src={anuncioDetalle.foto2} className="w-full h-full object-cover" /> : <div className="text-4xl text-amber-300">📦</div>
+                  )}
+                  {fotoSeleccionadaIndex === 2 && (
+                    anuncioDetalle.foto3 ? <img src={anuncioDetalle.foto3} className="w-full h-full object-cover" /> : <div className="text-4xl text-amber-300">📦</div>
+                  )}
+                  {fotoSeleccionadaIndex === 3 && (
+                    anuncioDetalle.foto4 ? <img src={anuncioDetalle.foto4} className="w-full h-full object-cover" /> : <div className="text-4xl text-amber-300">📦</div>
+                  )}
+                </div>
+
+                {/* MINIATURAS FOTOS */}
+                <div className="flex gap-2">
+                  {[anuncioDetalle.foto1, anuncioDetalle.foto2, anuncioDetalle.foto3, anuncioDetalle.foto4].map((f, idx) => f ? (
+                    <button 
+                      key={idx} 
+                      type="button" 
+                      onClick={() => setFotoSeleccionadaIndex(idx)} 
+                      className={`w-12 h-12 rounded-lg border overflow-hidden ${fotoSeleccionadaIndex === idx ? 'border-purple-600 ring-2 ring-purple-400' : 'border-amber-200'}`}
+                    >
+                      <img src={f} className="w-full h-full object-cover" />
+                    </button>
+                  ) : null)}
+                </div>
+
+                {/* ENLACE / REPRODUCTOR VIDEO SI EXISTE */}
+                {anuncioDetalle.video_url && (
+                  <div className="p-3 bg-purple-50 rounded-xl border border-purple-200 space-y-1">
+                    <p className="text-[10px] font-black uppercase text-purple-700 flex items-center gap-1">
+                      <Video className="w-3.5 h-3.5" /> Video Demostrativo Disponible
+                    </p>
+                    <a 
+                      href={anuncioDetalle.video_url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-xs font-bold text-purple-700 underline flex items-center gap-1 hover:text-purple-900"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" /> Abrir Video del Anuncio
+                    </a>
+                  </div>
                 )}
               </div>
 
               <div className="space-y-3 text-xs">
                 <p className="text-2xl font-black text-amber-700">${Number(anuncioDetalle.precio).toFixed(2)}</p>
+                <p className="text-slate-600"><strong>Categoría:</strong> {anuncioDetalle.categoria || 'General'}</p>
                 <p className="text-slate-600"><strong>Ciudad:</strong> {anuncioDetalle.ciudad}</p>
                 <p className="text-slate-600"><strong>Condición:</strong> {anuncioDetalle.condicion}</p>
                 <p className="text-slate-600"><strong>Vendedor:</strong> {anuncioDetalle.vendedor_nombre}</p>
@@ -1215,7 +1372,7 @@ export default function QvendesHome() {
         </div>
       )}
 
-      {/* ➕ MODAL PUBLICAR ANUNCIO CON CHECKBOXES DE PAGO & ENVÍO */}
+      {/* ➕ MODAL PUBLICAR ANUNCIO (HASTA 4 FOTOS Y 1 VIDEO OPCIONAL) */}
       {mostrarModalPublicar && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-white border border-amber-300 rounded-3xl max-w-xl w-full p-6 sm:p-8 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -1251,18 +1408,55 @@ export default function QvendesHome() {
                   </div>
                 </div>
 
+                {/* CATEGORÍA SELECCIONABLE & OPCIÓN AGREGAR NUEVA */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[10px] font-black uppercase text-purple-700 mb-1">Categoría</label>
-                    <select value={pubCategoria} onChange={(e) => setPubCategoria(e.target.value)} className="w-full bg-amber-50/60 border border-amber-300 rounded-xl p-3 font-bold text-slate-900 outline-none">
-                      <option value="Vehículos">Vehículos</option>
-                      <option value="Tecnología">Tecnología</option>
-                      <option value="Hogar">Hogar</option>
-                      <option value="Moda">Moda</option>
-                      <option value="Inmuebles">Inmuebles</option>
-                      <option value="Servicios">Servicios</option>
+                    <select 
+                      value={pubCategoria} 
+                      onChange={(e) => {
+                        if (e.target.value === 'NUEVA_CATEGORIA') {
+                          setMostrarInputNuevaCat(true);
+                        } else {
+                          setPubCategoria(e.target.value);
+                          setMostrarInputNuevaCat(false);
+                        }
+                      }} 
+                      className="w-full bg-amber-50/60 border border-amber-300 rounded-xl p-3 font-bold text-slate-900 outline-none"
+                    >
+                      {categoriasLista.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                      <option value="NUEVA_CATEGORIA">➕ Agregar nueva categoría...</option>
                     </select>
+
+                    {mostrarInputNuevaCat && (
+                      <div className="mt-2 flex gap-1">
+                        <input 
+                          type="text" 
+                          value={nuevaCatNombre} 
+                          onChange={(e) => setNuevaCatNombre(e.target.value)} 
+                          placeholder="Nombre de la nueva categoría" 
+                          className="flex-1 bg-white border border-purple-400 rounded-lg p-2 text-xs font-bold text-slate-900"
+                        />
+                        <button 
+                          type="button" 
+                          onClick={() => {
+                            if (nuevaCatNombre.trim()) {
+                              setCategoriasLista([...categoriasLista, nuevaCatNombre.trim()]);
+                              setPubCategoria(nuevaCatNombre.trim());
+                              setNuevaCatNombre('');
+                              setMostrarInputNuevaCat(false);
+                            }
+                          }}
+                          className="bg-purple-600 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg"
+                        >
+                          Añadir
+                        </button>
+                      </div>
+                    )}
                   </div>
+
                   <div>
                     <label className="block text-[10px] font-black uppercase text-purple-700 mb-1">Ciudad</label>
                     <select value={pubCiudad} onChange={(e) => setPubCiudad(e.target.value)} className="w-full bg-amber-50/60 border border-amber-300 rounded-xl p-3 font-bold text-slate-900 outline-none">
@@ -1314,9 +1508,43 @@ export default function QvendesHome() {
                   <textarea rows={3} value={pubDescripcion} onChange={(e) => setPubDescripcion(e.target.value)} placeholder="Describe tu producto..." className="w-full bg-amber-50/60 border border-amber-300 rounded-xl p-3 font-semibold text-slate-900 outline-none"></textarea>
                 </div>
 
-                <div>
-                  <label className="block text-[10px] font-black uppercase text-purple-700 mb-1">Fotografía Principal *</label>
-                  <input type="file" accept="image/*" onChange={(e) => handleSubirFoto(e, 1)} className="w-full text-xs font-semibold" />
+                {/* OPCIÓN HASTA 4 FOTOS Y 1 VIDEO */}
+                <div className="space-y-3 p-3 bg-purple-50/60 rounded-2xl border border-purple-200">
+                  <label className="block text-[10px] font-black uppercase text-purple-700 flex items-center gap-1">
+                    <Camera className="w-3.5 h-3.5 text-purple-600" /> Subir Fotografías (Hasta 4 fotos - Opcionales)
+                  </label>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <span className="text-[9px] font-bold text-slate-600">Foto Principal (Foto 1) *</span>
+                      <input type="file" accept="image/*" onChange={(e) => handleSubirFoto(e, 1)} className="w-full text-xs font-semibold mt-1" />
+                    </div>
+                    <div>
+                      <span className="text-[9px] font-bold text-slate-600">Foto 2 (Opcional)</span>
+                      <input type="file" accept="image/*" onChange={(e) => handleSubirFoto(e, 2)} className="w-full text-xs font-semibold mt-1" />
+                    </div>
+                    <div>
+                      <span className="text-[9px] font-bold text-slate-600">Foto 3 (Opcional)</span>
+                      <input type="file" accept="image/*" onChange={(e) => handleSubirFoto(e, 3)} className="w-full text-xs font-semibold mt-1" />
+                    </div>
+                    <div>
+                      <span className="text-[9px] font-bold text-slate-600">Foto 4 (Opcional)</span>
+                      <input type="file" accept="image/*" onChange={(e) => handleSubirFoto(e, 4)} className="w-full text-xs font-semibold mt-1" />
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-purple-200">
+                    <label className="block text-[10px] font-black uppercase text-purple-700 mb-1 flex items-center gap-1">
+                      <Video className="w-3.5 h-3.5 text-indigo-600" /> Enlace de Video (Opcional - YouTube, TikTok, MP4)
+                    </label>
+                    <input 
+                      type="url" 
+                      value={pubVideo} 
+                      onChange={(e) => setPubVideo(e.target.value)} 
+                      placeholder="Ej. https://www.youtube.com/watch?v=..." 
+                      className="w-full bg-white border border-purple-300 rounded-xl p-2.5 text-xs font-bold text-slate-900 outline-none" 
+                    />
+                  </div>
                 </div>
 
                 <button type="submit" disabled={pubProcesando} className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white font-black py-4 rounded-xl uppercase text-xs shadow-lg">

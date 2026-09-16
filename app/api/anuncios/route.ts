@@ -45,6 +45,7 @@ async function asegurarTablasAnuncios() {
     await sql`ALTER TABLE anuncios ADD COLUMN IF NOT EXISTS foto2 TEXT`;
     await sql`ALTER TABLE anuncios ADD COLUMN IF NOT EXISTS foto3 TEXT`;
     await sql`ALTER TABLE anuncios ADD COLUMN IF NOT EXISTS foto4 TEXT`;
+    await sql`ALTER TABLE anuncios ADD COLUMN IF NOT EXISTS video_url TEXT`;
     await sql`ALTER TABLE anuncios ADD COLUMN IF NOT EXISTS metodos_pago TEXT DEFAULT 'Efectivo / Transferencia Directa / Pago por plataforma Qvendes'`;
     await sql`ALTER TABLE anuncios ADD COLUMN IF NOT EXISTS metodos_envio TEXT DEFAULT 'Entrega personal / Envío a provincias'`;
     await sql`ALTER TABLE anuncios ADD COLUMN IF NOT EXISTS permitir_whatsapp BOOLEAN DEFAULT true`;
@@ -95,6 +96,7 @@ export async function GET(request: Request) {
         a.foto2,
         a.foto3,
         a.foto4,
+        COALESCE(a.video_url, '') AS video_url,
         COALESCE(a.metodos_pago, 'Efectivo / Transferencia Directa / Pago por plataforma Qvendes') AS metodos_pago,
         COALESCE(a.metodos_envio, 'Entrega personal / Envío a provincias') AS metodos_envio,
         COALESCE(a.permitir_whatsapp, true) AS permitir_whatsapp,
@@ -175,7 +177,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { vendedor_id, vendedor_email, titulo, precio, condicion, categoria, ciudad, descripcion, foto1, foto2, foto3, foto4, metodos_pago, metodos_envio, permitir_whatsapp } = body;
+    const { vendedor_id, vendedor_email, titulo, precio, condicion, categoria, ciudad, descripcion, foto1, foto2, foto3, foto4, video_url, metodos_pago, metodos_envio, permitir_whatsapp } = body;
 
     await asegurarTablasAnuncios();
 
@@ -219,11 +221,11 @@ export async function POST(request: Request) {
     const insertado = await sql`
       INSERT INTO anuncios (
         vendedor_id, titulo, precio, condicion, categoria, ciudad, descripcion,
-        foto1, foto2, foto3, foto4, metodos_pago, metodos_envio, permitir_whatsapp, estado
+        foto1, foto2, foto3, foto4, video_url, metodos_pago, metodos_envio, permitir_whatsapp, estado
       ) VALUES (
         ${vId}, ${titulo}, ${parseFloat(precio)}, ${condicion || 'nuevo'},
         ${categoria || 'general'}, ${ciudad || 'Loja'}, ${descripcion || ''},
-        ${foto1 || null}, ${foto2 || null}, ${foto3 || null}, ${foto4 || null},
+        ${foto1 || null}, ${foto2 || null}, ${foto3 || null}, ${foto4 || null}, ${video_url || null},
         ${metodos_pago || 'Efectivo / Transferencia Directa / Pago por plataforma Qvendes'},
         ${metodos_envio || 'Entrega personal / Envío a provincias'},
         ${permitir_whatsapp !== false},
