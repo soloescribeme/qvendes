@@ -89,6 +89,7 @@ export default function QvendesHome() {
   // NUEVOS MODALES SOLICITADOS
   const [mostrarModalMisAnuncios, setMostrarModalMisAnuncios] = useState(false);
   const [mostrarModalBuzon, setMostrarModalBuzon] = useState(false);
+  const [mostrarModalChat, setMostrarModalChat] = useState(false);
   const [mostrarModalRecargar, setMostrarModalRecargar] = useState(false);
   const [mostrarDatosBancarios, setMostrarDatosBancarios] = useState(false);
 
