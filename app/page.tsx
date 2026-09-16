@@ -600,21 +600,6 @@ export default function QvendesHome() {
     }
   };
 
-  // MANEJADOR PARA CONVERTIR FOTOS A BASE64 (HASTA 4 FOTOS)
-  const handleSubirFoto = (e: React.ChangeEvent<HTMLInputElement>, index: 1 | 2 | 3 | 4) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64 = reader.result as string;
-      if (index === 1) setPubFoto1(base64);
-      if (index === 2) setPubFoto2(base64);
-      if (index === 3) setPubFoto3(base64);
-      if (index === 4) setPubFoto4(base64);
-    };
-    reader.readAsDataURL(file);
-  };
-
   // ACTIVAR PROMOCIÓN TOP O PREMIUM DESCONTANDO SALDO
   const handleActivarPromocion = async (tipo: 'top' | 'premium') => {
     if (!user || !anuncioAPromocionar) return;
