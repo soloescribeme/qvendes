@@ -839,24 +839,6 @@ export default function QvendesHome() {
               🛠️ Servicios
             </button>
           </div>
-
-          {/* FILTROS RÁPIDOS INSTANTÁNEOS POR CATEGORÍA */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px]">
-            <span className="font-bold text-slate-500 text-[11px] uppercase tracking-wider mr-1">Categorías:</span>
-            <button type="button" onClick={() => aplicarFiltroCategoriaRapido('')} className={`px-2.5 py-1 rounded-lg border transition-all whitespace-nowrap ${!filtroCategoria ? 'bg-indigo-600 text-white border-indigo-600 font-bold' : 'bg-white text-slate-600 border-amber-200 hover:border-indigo-400'}`}>
-              Todas
-            </button>
-            {categoriasLista.map(cat => (
-              <button 
-                key={cat} 
-                type="button" 
-                onClick={() => aplicarFiltroCategoriaRapido(cat)} 
-                className={`px-2.5 py-1 rounded-lg border transition-all whitespace-nowrap ${filtroCategoria === cat ? 'bg-indigo-600 text-white border-indigo-600 font-bold' : 'bg-white text-slate-600 border-amber-200 hover:border-indigo-400'}`}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
         </div>
       </section>
 
