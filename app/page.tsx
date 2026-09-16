@@ -461,7 +461,6 @@ export default function QvendesHome() {
           foto2: pubFoto2,
           foto3: pubFoto3,
           foto4: pubFoto4,
-          video_url: pubVideo,
           metodos_pago: metodosPagoTexto,
           metodos_envio: metodosEnvioTexto,
           permitir_whatsapp: pubPermitirWhatsapp
@@ -479,7 +478,6 @@ export default function QvendesHome() {
         setPubFoto2('');
         setPubFoto3('');
         setPubFoto4('');
-        setPubVideo('');
 
         // Limpiar filtros activos para visibilidad inmediata
         setFiltroCiudad('');
